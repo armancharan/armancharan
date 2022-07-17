@@ -3,7 +3,7 @@ import { Page } from "../../components/page"
 import { BlogEntry, getEntries, getContentByPageId } from "../../utils/notion"
 
 const EntryPage: NextPage<BlogEntry> = props => {
-  console.log(props)
+  return null
   return (
     <Page>
       {props.content.map(block => {
@@ -23,18 +23,18 @@ const EntryPage: NextPage<BlogEntry> = props => {
 
 export default EntryPage
 
-export async function getStaticPaths() {
-  return {
-    paths: (await getEntries()).map(entry => ({ params: { id: entry.id } })),
-    fallback: false,
-  }
-}
+// export async function getStaticPaths() {
+//   return {
+//     paths: (await getEntries()).map(entry => ({ params: { id: entry.id } })),
+//     fallback: false,
+//   }
+// }
 
-export const getStaticProps: GetStaticProps<BlogEntry> = async context => {
-  const id = String(context.params?.id)
-  const content = await getContentByPageId(id)
-  if (!content) throw new Error(`Invalid or missing entry — ${id}`)
-  return {
-    props: { content }
-  }
-}
+// export const getStaticProps: GetStaticProps<BlogEntry> = async context => {
+//   const id = String(context.params?.id)
+//   const content = await getContentByPageId(id)
+//   if (!content) throw new Error(`Invalid or missing entry — ${id}`)
+//   return {
+//     props: { content }
+//   }
+// }
