@@ -6,7 +6,7 @@ import { ComponentType, useEffect, useMemo } from 'react'
 import { BlogEntryPreview, getEntries } from '../utils/notion'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { OrbitControls, PerspectiveCamera, PresentationControls, useGLTF } from '@react-three/drei'
-import { AsciiEffect } from 'three-stdlib'
+import styled from 'styled-components'
 import { Vector3 } from 'three'
 
 const Colors = {
@@ -24,38 +24,16 @@ const HomePage: NextPage<HomePageProps> = props => {
     <Page>
       <div style={{ height: '50px' }} />
 
-      <div
-            style={{
-              // display: 'grid',
-              // gridGap: 'auto',
-              // gridTemplateColumns: 'repeat(4, 1fr)',
-              // gridTemplateRows: 'min-content',
-              margin: '0 auto',
-              maxWidth: '100%',
-              width: '1000px',
-
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center'
-            }}
-        >
-          {/* Hero. */}
-          <div
-              style={{
-                position: 'relative',
-
-                gridColumnStart: 2,
-                gridColumnEnd: 5,
-                gridRowStart: 1,
-                gridRowEnd: 3,
-              }}
-          >
+      <Grid>
+          <Hero>
             <Canvas
                 camera={{ position: new Vector3(1.618, 0, 1) }}
                 fallback={null}
                 style={{
-                  width: '1000px',
-                  maxWidth: '100%',
+                  width: '100%',
+                  // HACK: Prevents the canvas from becoming wider than the screen.
+                  // Unsure why this happens.
+                  maxWidth: 'calc(100vw - 20px)',
                 }}
             >
               <Monument3D/>
@@ -82,29 +60,63 @@ const HomePage: NextPage<HomePageProps> = props => {
             >
               <h1
                   style={{
-                    fontWeight: 800,
                     fontSize: '50px',
+                    fontWeight: 800,
+                    pointerEvents: 'none',
                     textAlign: 'center',
+                    userSelect: 'none',
                   }}
               >
                 arman charan
               </h1>
             </div>
-          </div>
+          </Hero>
 
           {/* Articles. */}
-          {/* {props.entries.map(({ id, cover, name }) => (
+          {props.entries.filter(entry => entry.publish).map(({ id, cover, name }) => (
               <EntryPreview
                 key={id}
                 cover={cover}
                 id={id}
                 name={name}
               />
-          ))} */}
-        </div>
+          ))}
+        </Grid>
     </Page>
   )
 }
+
+const Grid = styled.div`
+  display: grid;
+  margin: 0 auto;
+  max-width: 100%;
+  position: relative;
+
+  grid-template-columns: repeat(1, 1fr);
+  grid-template-rows: min-content;
+
+  @media (min-width: 1000px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+`
+
+const Hero = styled.div`
+  max-width: 100%;
+  position: relative;
+  width: 100%;
+
+  grid-column-start: 1;
+  grid-column-end: 1;
+  grid-row-start: 1;
+  grid-row-end: 2;
+  
+  @media (min-width: 1000px) {
+    grid-column-start: 2;
+    grid-column-end: 5;
+    grid-row-start: 1;
+    grid-row-end: 3;
+  }
+`
 
 const Monument3D = () => {
   const obj = useLoader(OBJLoader, '/arman.obj')
@@ -113,13 +125,20 @@ const Monument3D = () => {
 
 }
 
-const EntryPreview: ComponentType<{ cover: string | undefined, id: string, name: string }> = props => {
+const EntryPreview: ComponentType<{ cover: string | null, id: string, name: string }> = props => {
   return (
       <div style={{ height: '200px', margin: '0', width: '100%' }}>
         <div>
           {props.cover && <img
               src={props.cover}
-              style={{ border: '1px solid black', borderRadius: '0', width: '100%' }}
+              style={{
+                border: '1px solid #E8E3E3',
+                background: '#FAFAFA',
+                borderRadius: '0',
+                height: '150px',
+                objectFit: 'contain',
+                width: '100%',
+              }}
           />}
         </div>
 
@@ -134,10 +153,10 @@ const EntryPreview: ComponentType<{ cover: string | undefined, id: string, name:
 
 export default HomePage
 
-// export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
-//   return {
-//     props: {
-//       entries: await getEntries()
-//     }
-//   }
-// }
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+  return {
+    props: {
+      entries: await getEntries()
+    }
+  }
+}

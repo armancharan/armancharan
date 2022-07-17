@@ -23,7 +23,8 @@ export type BlogEntryPreview = {
   cover: string | null
   images: string[]
   manufacturer: string
-  name: string,
+  name: string
+  publish: boolean
 }
 
 let entries: BlogEntryPreview[] | undefined
@@ -34,7 +35,6 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
     const response = await notion.databases.query({ database_id: Config.NOTION.ENTRIES_DATABASE_ID })
     for (const result of response.results) {
 
-      console.log('RESULT', result)
 
       const resultHasPropertiesField = 'properties' in result
       if (!resultHasPropertiesField) continue
@@ -44,6 +44,10 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
   
       const id = result.id
       if (!id) continue
+
+      const publish = 'publish' in properties
+          && properties.publish.type === 'checkbox'
+          && properties.publish.checkbox
 
       const cover = 'cover' in properties
           && properties.cover.type === 'files'
@@ -78,6 +82,7 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
         images,
         manufacturer,
         name,
+        publish,
       })
     }
   }
