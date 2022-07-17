@@ -20,6 +20,7 @@ export type BlogEntry = {
 
 export type BlogEntryPreview = {
   id: string
+  cover: string | undefined
   images: string[]
   manufacturer: string
   name: string,
@@ -43,6 +44,15 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
   
       const id = result.id
       if (!id) continue
+
+      const cover = 'cover' in properties
+          && properties.cover.type === 'files'
+          && properties.cover.files[0]
+          && (
+              properties.cover.files[0].type === 'external' && properties.cover.files[0].external.url
+              || properties.cover.files[0].type === 'file' && properties.cover.files[0].file.url
+          )
+          || null
   
       const images = 'images' in properties
           && properties.images.type === 'files'
@@ -64,6 +74,7 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
   
       entries.push({
         id,
+        cover,
         images,
         manufacturer,
         name,

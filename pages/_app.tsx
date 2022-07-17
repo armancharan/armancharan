@@ -7,7 +7,7 @@ class App extends NextApp {
   render() {
     return (
       <>
-        <NavigationBar/>
+        {/* <NavigationBar/> */}
         <this.props.Component {...this.props.pageProps}/>
       </>
     )
