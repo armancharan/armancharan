@@ -93,10 +93,12 @@ const Grid = styled.div`
   max-width: 100%;
   position: relative;
 
-  grid-template-columns: repeat(1, 1fr);
-  grid-template-rows: min-content;
+  
+  grid-row-gap: 20px;
+  grid-column-gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
 
-  @media (min-width: 1000px) {
+  @media(min-width: 1000px) {
     grid-template-columns: repeat(4, 1fr);
   }
 `
@@ -107,9 +109,9 @@ const Hero = styled.div`
   width: 100%;
 
   grid-column-start: 1;
-  grid-column-end: 1;
+  grid-column-end: 5;
   grid-row-start: 1;
-  grid-row-end: 2;
+  grid-row-end: 3;
   
   @media (min-width: 1000px) {
     grid-column-start: 2;
