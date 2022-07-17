@@ -30,6 +30,7 @@ const HomePage: NextPage<HomePageProps> = props => {
                 camera={{ position: new Vector3(1.618, 0, 1) }}
                 fallback={null}
                 style={{
+                  height: '400px',
                   width: '100%',
                   // HACK: Prevents the canvas from becoming wider than the screen.
                   // Unsure why this happens.
