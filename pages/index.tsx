@@ -9,31 +9,40 @@ import { OrbitControls, PerspectiveCamera, PresentationControls, useGLTF } from 
 import { AsciiEffect } from 'three-stdlib'
 import { Vector3 } from 'three'
 
+const Colors = {
+  BLACK: '#000000',
+}
+
 
 type HomePageProps = {
   entries: BlogEntryPreview[]
 }
 
 const HomePage: NextPage<HomePageProps> = props => {
-  
+
   return (
     <Page>
       <div style={{ height: '50px' }} />
 
       <div
             style={{
-              display: 'grid',
+              // display: 'grid',
               gridGap: 'auto',
               gridTemplateColumns: 'repeat(4, 1fr)',
               gridTemplateRows: 'min-content',
               margin: '0 auto',
               maxWidth: '100%',
               width: '1000px',
+
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
         >
           {/* Hero. */}
           <div
               style={{
+                position: 'relative',
 
                 gridColumnStart: 2,
                 gridColumnEnd: 5,
@@ -41,22 +50,54 @@ const HomePage: NextPage<HomePageProps> = props => {
                 gridRowEnd: 3,
               }}
           >
-            <Canvas fallback={null} >
+            <Canvas
+                camera={{ position: new Vector3(1.618, 0, 1) }}
+                fallback={null}
+                style={{ maxWidth: '100%' }}
+            >
               <Monument3D/>
               {/* <AsciiRenderer /> */}
-              <OrbitControls makeDefault position={[.5, .5, 0]} target={[0, 0, 0]} minZoom={5} maxZoom={5} />
+              <OrbitControls
+                  autoRotate={true}
+                  enablePan={false}
+                  enableRotate={false}
+                  enableZoom={false}
+              />
             </Canvas>
+
+            <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+            >
+              <h1
+                  style={{
+                    fontWeight: 800,
+                    fontSize: '50px',
+                    textAlign: 'center',
+                  }}
+              >
+                arman charan
+              </h1>
+            </div>
           </div>
 
           {/* Articles. */}
-          {props.entries.map(({ id, cover, name }) => (
+          {/* {props.entries.map(({ id, cover, name }) => (
               <EntryPreview
                 key={id}
                 cover={cover}
                 id={id}
                 name={name}
               />
-          ))}
+          ))} */}
         </div>
     </Page>
   )
@@ -64,20 +105,8 @@ const HomePage: NextPage<HomePageProps> = props => {
 
 const Monument3D = () => {
   const obj = useLoader(OBJLoader, '/arman.obj')
-  
-  return <PresentationControls
-      global={false} // Spin globally or by dragging the model
-      cursor={true} // Whether to toggle cursor style on drag
-      snap={false} // Snap-back to center (can also be a spring config)
-      speed={1} // Speed factor
-      zoom={1} // Zoom factor when half the polar-max is reached
-      rotation={[4, 1, 0]} // Default rotation
-      polar={[-Infinity, Infinity]} // Vertical limits
-      azimuth={[-Infinity, Infinity]} // Horizontal limits
-      config={{ mass: 1, tension: 170, friction: 26 }} // Spring config
-  >
-    <primitive object={obj} />
-  </PresentationControls>
+
+  return <primitive object={obj} />
 
 }
 
@@ -92,7 +121,7 @@ const EntryPreview: ComponentType<{ cover: string | undefined, id: string, name:
         </div>
 
         <Link href={`/entry/${props.id}`} passHref>
-          <a style={{ fontSize: '12px' }}>
+          <a style={{ color: Colors.BLACK, fontSize: '12px' }}>
             {props.name}
           </a>
         </Link>
@@ -111,10 +140,8 @@ export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
 }
 
 function AsciiRenderer({ renderIndex = 1, characters = ' .:-+*=%@#', ...options }) {
-  // Reactive state
   const { size, gl, scene, camera } = useThree()
 
-  // Create effect
   const effect = useMemo(() => {
     const effect = new AsciiEffect(gl, characters, options)
     effect.domElement.style.position = 'absolute'
@@ -126,20 +153,18 @@ function AsciiRenderer({ renderIndex = 1, characters = ' .:-+*=%@#', ...options 
     return effect
   }, [characters, options.invert])
 
-  // Append on mount, remove on unmount
   useEffect(() => {
     gl.domElement.parentNode?.appendChild(effect.domElement)
+
     return () => {
       gl.domElement.parentNode?.removeChild(effect.domElement)
     }
   }, [effect])
 
-  // Set size
   useEffect(() => {
     effect.setSize(size.width, size.height)
   }, [effect, size])
 
-  // Take over render-loop (that is what the index is for)
   useFrame((state) => {
     effect.render(scene, camera)
   }, renderIndex)
