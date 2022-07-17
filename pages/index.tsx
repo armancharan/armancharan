@@ -109,13 +109,13 @@ const Hero = styled.div`
   width: 100%;
 
   grid-column-start: 1;
-  grid-column-end: 5;
+  grid-column-end: 4;
   grid-row-start: 1;
   grid-row-end: 3;
   
   @media (min-width: 1000px) {
     grid-column-start: 2;
-    grid-column-end: 5;
+    grid-column-end: 4;
     grid-row-start: 1;
     grid-row-end: 3;
   }

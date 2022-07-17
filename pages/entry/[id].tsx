@@ -1,40 +1,60 @@
 import { GetStaticProps, NextPage } from "next"
+import styled from "styled-components"
 import { Page } from "../../components/page"
-import { BlogEntry, getEntries, getContentByPageId } from "../../utils/notion"
+import { BlogEntry, getEntries, getEntry, getContentByPageId } from "../../utils/notion"
 
-const EntryPage: NextPage<BlogEntry> = props => {
-  return null
+const EntryPage: NextPage<BlogEntry & { error: false } | { error: true }> = props => {
+  if (props.error) {
+    return <Page>
+      An unknown error occurred.
+    </Page>
+  }
+
   return (
     <Page>
-      {props.content.map(block => {
-        const isParagraphBlock = 'paragraph' in block
-        if (isParagraphBlock) {
-          return block.paragraph.rich_text.reduce((output, text) => {
-            output += text.plain_text
-            return output
-          }, '')
-        }
+      <h1>{props.name}</h1>
+      <Content>
+        {props.content?.map(block => {
+          const isParagraphBlock = 'paragraph' in block
+          if (isParagraphBlock) {
+            return block.paragraph.rich_text.reduce((output, text) => {
+              output += text.plain_text
+              return output
+            }, '')
+          }
 
-        return ''
-      })}
+          return ''
+        })}
+      </Content>
     </Page>
   )
 }
 
 export default EntryPage
 
-// export async function getStaticPaths() {
-//   return {
-//     paths: (await getEntries()).map(entry => ({ params: { id: entry.id } })),
-//     fallback: false,
-//   }
-// }
+const Content = styled.div`
+  line-height: 1.618;
+`
 
-// export const getStaticProps: GetStaticProps<BlogEntry> = async context => {
-//   const id = String(context.params?.id)
-//   const content = await getContentByPageId(id)
-//   if (!content) throw new Error(`Invalid or missing entry — ${id}`)
-//   return {
-//     props: { content }
-//   }
-// }
+export async function getStaticPaths() {
+  return {
+    paths: (await getEntries()).map(entry => ({ params: { id: entry.id } })),
+    fallback: false,
+  }
+}
+
+export const getStaticProps: GetStaticProps<BlogEntry | {}> = async context => {
+
+  const id = String(context.params?.id)
+  const [
+    entry,
+    content,
+  ] = await Promise.all([
+    await getEntry(id),
+    await getContentByPageId(id),
+  ])
+
+  return {
+    props: entry ? { error: false, ...entry, content } : { error: true }
+  }
+}
