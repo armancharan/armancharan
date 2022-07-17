@@ -27,9 +27,9 @@ const HomePage: NextPage<HomePageProps> = props => {
       <div
             style={{
               // display: 'grid',
-              gridGap: 'auto',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gridTemplateRows: 'min-content',
+              // gridGap: 'auto',
+              // gridTemplateColumns: 'repeat(4, 1fr)',
+              // gridTemplateRows: 'min-content',
               margin: '0 auto',
               maxWidth: '100%',
               width: '1000px',
@@ -53,7 +53,10 @@ const HomePage: NextPage<HomePageProps> = props => {
             <Canvas
                 camera={{ position: new Vector3(1.618, 0, 1) }}
                 fallback={null}
-                style={{ maxWidth: '100%' }}
+                style={{
+                  width: '1000px',
+                  maxWidth: '100%',
+                }}
             >
               <Monument3D/>
               {/* <AsciiRenderer /> */}
