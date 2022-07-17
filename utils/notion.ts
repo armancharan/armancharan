@@ -20,7 +20,7 @@ export type BlogEntry = {
 
 export type BlogEntryPreview = {
   id: string
-  cover: string | undefined
+  cover: string | null
   images: string[]
   manufacturer: string
   name: string,
