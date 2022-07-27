@@ -14,7 +14,6 @@ const Colors = {
   BLACK: '#000000',
 }
 
-
 type HomePageProps = {
   entries: BlogEntryPreview[],
 }
@@ -75,12 +74,10 @@ const HomePage: NextPage<HomePageProps> = props => {
           </div>
 
           {/* Articles. */}
-          {props.entries.filter(entry => entry.publish).map(({ id, cover, name }) => (
+          {props.entries.filter(entry => entry.publish).map(props => (
               <EntryPreview
-                key={id}
-                cover={cover}
-                id={id}
-                name={name}
+                key={props.id}
+                {...props}
               />
           ))}
         </div>
@@ -95,7 +92,7 @@ const Monument3D = () => {
 
 }
 
-const EntryPreview: ComponentType<{ cover: string | null, id: string, name: string }> = props => {
+const EntryPreview: ComponentType<BlogEntryPreview> = props => {
   return (
       <div style={{ height: '200px', margin: '0', width: '100%', position: 'relative' }}>
         
@@ -118,11 +115,25 @@ const EntryPreview: ComponentType<{ cover: string | null, id: string, name: stri
               />
           </div>}
         <Link href={`/entry/${props.id}`} passHref>
-          <a style={{ color: Colors.BLACK, fontSize: '12px' }}>
+          <a style={{ color: Colors.BLACK, fontSize: '13px' }}>
             {props.name}
           </a>
         </Link>
-        
+
+        {props.tags ? (
+            <div style={{ marginTop: '2px' }}>
+              {props.tags.map(tag => {
+                return (
+                  <div
+                      className={styles.tag}
+                      key={tag.id}
+                  >
+                    {tag.name}
+                  </div>
+                )
+              })}
+            </div>
+        ) : null}
       </div>
   )
 }

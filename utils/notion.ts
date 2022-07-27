@@ -26,6 +26,11 @@ export type BlogEntryPreview = {
   manufacturer: string
   name: string
   publish: boolean
+  tags: { 
+    color: 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
+    id: string
+    name: string
+  }[] | null
 }
 
 let entries: BlogEntryPreview[] | undefined
@@ -38,11 +43,16 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
       const resultHasPropertiesField = 'properties' in result
       if (!resultHasPropertiesField) continue
       const { archived, properties } = result
-
+      
       if (archived) continue
   
       const id = result.id
       if (!id) continue
+
+      const tags = 'tags' in properties
+          && properties.tags.type === 'multi_select'
+          && properties.tags.multi_select
+          || null
 
       const publish = 'publish' in properties
           && properties.publish.type === 'checkbox'
@@ -82,6 +92,7 @@ export const getEntries = async (): Promise<BlogEntryPreview[]> => {
         manufacturer,
         name,
         publish,
+        tags,
       })
     }
   }

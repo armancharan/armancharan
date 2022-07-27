@@ -9,7 +9,7 @@
   grid-column-gap: 20px;
   grid-template-columns: repeat(3, 1fr);
 
-  @media screen and (min-width: 1000px) {
+  @media screen and (min-width: 800px) {
     grid-template-columns: repeat(4, 1fr);
   }
 }
@@ -31,7 +31,7 @@
   grid-row-start: 1;
   grid-row-end: 3;
 
-  @media screen and (min-width: 1000px) {
+  @media screen and (min-width: 800px) {
     /* //  - - - - - - - - - - -
     // |  0  |  Hero   |  1  | 
     //  - - - - - - - - - - - */
@@ -40,4 +40,12 @@
     grid-row-start: 1;
     grid-row-end: 3;
   }
+}
+
+.tag {
+  border: 1px solid black;
+  display: inline-block;
+  font-size: 10px;
+  margin-right: 4px;
+  padding: 2px 4px;
 }
