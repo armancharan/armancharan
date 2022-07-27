@@ -8,6 +8,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { OrbitControls, PerspectiveCamera, PresentationControls, useGLTF } from '@react-three/drei'
 import styled from 'styled-components'
 import { Vector3 } from 'three'
+import Image from 'next/image'
 
 const Colors = {
   BLACK: '#000000',
@@ -130,26 +131,32 @@ const Monument3D = () => {
 
 const EntryPreview: ComponentType<{ cover: string | null, id: string, name: string }> = props => {
   return (
-      <div style={{ height: '200px', margin: '0', width: '100%' }}>
-        <div>
-          {props.cover && <img
-              src={props.cover}
+      <div style={{ height: '200px', margin: '0', width: '100%', position: 'relative' }}>
+        
+          {props.cover && <div
               style={{
                 border: '1px solid #E8E3E3',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
                 background: '#FAFAFA',
                 borderRadius: '0',
-                height: '150px',
-                objectFit: 'contain',
-                width: '100%',
               }}
-          />}
-        </div>
-
+            >
+              <Image
+                  src={props.cover}
+                  height="100%"
+                  width="100%"
+                  objectFit="contain"
+                  objectPosition="center"      
+              />
+          </div>}
         <Link href={`/entry/${props.id}`} passHref>
           <a style={{ color: Colors.BLACK, fontSize: '12px' }}>
             {props.name}
           </a>
         </Link>
+        
       </div>
   )
 }
