@@ -1,0 +1,43 @@
+
+.grid {
+  display: grid;
+  margin: 0 auto;
+  max-width: 100%;
+  position: relative;
+
+  grid-row-gap: 20px;
+  grid-column-gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+
+  @media screen and (min-width: 1000px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.hero {
+  max-width: 100%;
+  position: relative;
+  width: 100%;
+
+  /* //  - - - - - 
+  // |  Hero   |
+  // |- - - - -|
+  // |    0    |
+  // |- - - - -|
+  // |    1    |
+  // |_ _ _ _ _| */
+  grid-column-start: 1;
+  grid-column-end: 4;
+  grid-row-start: 1;
+  grid-row-end: 3;
+
+  @media screen and (min-width: 1000px) {
+    /* //  - - - - - - - - - - -
+    // |  0  |  Hero   |  1  | 
+    //  - - - - - - - - - - - */
+    grid-column-start: 2;
+    grid-column-end: 4;
+    grid-row-start: 1;
+    grid-row-end: 3;
+  }
+}

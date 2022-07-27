@@ -1,14 +1,14 @@
 import { GetStaticProps, NextPage } from 'next'
 import { Page } from '../components/page'
 import Link from 'next/link'
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
-import { ComponentType, useEffect, useMemo } from 'react'
+import { Canvas, useLoader } from '@react-three/fiber'
+import { ComponentType } from 'react'
 import { BlogEntryPreview, getEntries } from '../utils/notion'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
-import { OrbitControls, PerspectiveCamera, PresentationControls, useGLTF } from '@react-three/drei'
-import styled from 'styled-components'
+import { OrbitControls } from '@react-three/drei'
 import { Vector3 } from 'three'
 import Image from 'next/image'
+import styles from './index.module.scss'
 
 const Colors = {
   BLACK: '#000000',
@@ -16,7 +16,7 @@ const Colors = {
 
 
 type HomePageProps = {
-  entries: BlogEntryPreview[]
+  entries: BlogEntryPreview[],
 }
 
 const HomePage: NextPage<HomePageProps> = props => {
@@ -25,8 +25,8 @@ const HomePage: NextPage<HomePageProps> = props => {
     <Page>
       <div style={{ height: '50px' }} />
 
-      <Grid>
-          <Hero>
+      <div className={styles.grid}>
+          <div className={styles.hero}>
             <Canvas
                 camera={{ position: new Vector3(1.618, 0, 1) }}
                 fallback={null}
@@ -39,7 +39,7 @@ const HomePage: NextPage<HomePageProps> = props => {
                 }}
             >
               <Monument3D/>
-              {/* <AsciiRenderer /> */}
+
               <OrbitControls
                   autoRotate={true}
                   enablePan={false}
@@ -72,7 +72,7 @@ const HomePage: NextPage<HomePageProps> = props => {
                 arman charan
               </h1>
             </div>
-          </Hero>
+          </div>
 
           {/* Articles. */}
           {props.entries.filter(entry => entry.publish).map(({ id, cover, name }) => (
@@ -83,44 +83,10 @@ const HomePage: NextPage<HomePageProps> = props => {
                 name={name}
               />
           ))}
-        </Grid>
+        </div>
     </Page>
   )
 }
-
-const Grid = styled.div`
-  display: grid;
-  margin: 0 auto;
-  max-width: 100%;
-  position: relative;
-
-  
-  grid-row-gap: 20px;
-  grid-column-gap: 20px;
-  grid-template-columns: repeat(3, 1fr);
-
-  @media(min-width: 1000px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-`
-
-const Hero = styled.div`
-  max-width: 100%;
-  position: relative;
-  width: 100%;
-
-  grid-column-start: 1;
-  grid-column-end: 4;
-  grid-row-start: 1;
-  grid-row-end: 3;
-  
-  @media (min-width: 1000px) {
-    grid-column-start: 2;
-    grid-column-end: 4;
-    grid-row-start: 1;
-    grid-row-end: 3;
-  }
-`
 
 const Monument3D = () => {
   const obj = useLoader(OBJLoader, '/arman.obj')
