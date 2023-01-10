@@ -1,7 +1,7 @@
-import { GetStaticProps, NextPage } from "next"
+import { GetServerSideProps, NextPage } from "next"
 import styled from "styled-components"
 import { Page } from "../../components/page"
-import { BlogEntry, getEntries, getEntry, getContentByPageId } from "../../utils/notion"
+import { BlogEntry, getEntry, getContentByPageId } from "../../utils/notion"
 
 const EntryPage: NextPage<BlogEntry & { error: false } | { error: true }> = props => {
   if (props.error) {
@@ -36,14 +36,7 @@ const Content = styled.div`
   line-height: 1.618;
 `
 
-export async function getStaticPaths() {
-  return {
-    paths: (await getEntries()).map(entry => ({ params: { id: entry.id } })),
-    fallback: false,
-  }
-}
-
-export const getStaticProps: GetStaticProps<BlogEntry | {}> = async context => {
+export const getServerSideProps: GetServerSideProps<BlogEntry | {}> = async context => {
 
   const id = String(context.params?.id)
   const [

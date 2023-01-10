@@ -1,4 +1,4 @@
-import { GetStaticProps, NextPage } from 'next'
+import { GetServerSideProps, NextPage } from 'next'
 import { Page } from '../components/page'
 import Link from 'next/link'
 import { Canvas, useLoader } from '@react-three/fiber'
@@ -140,7 +140,7 @@ const EntryPreview: ComponentType<BlogEntryPreview> = props => {
 
 export default HomePage
 
-export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<HomePageProps> = async () => {
   return {
     props: {
       entries: await getEntries()
