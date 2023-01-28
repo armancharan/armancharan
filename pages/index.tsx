@@ -47,30 +47,22 @@ const HomePage: NextPage<HomePageProps> = props => {
               />
             </Canvas>
 
-            <div
+            {/* TODO: Decide whether or not to publish some sort of background image. */}
+            {/* <img
+                src="/clouds.png"
                 style={{
-                  position: 'absolute',
+                  alignItems: 'center',
+                  display: 'flex',
+                  height: '100%',
+                  justifyContent: 'center',
                   left: 0,
+                  objectFit: 'cover',
+                  position: 'absolute',
                   top: 0,
                   width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  zIndex: -1,
                 }}
-            >
-              <h1
-                  style={{
-                    fontSize: '50px',
-                    fontWeight: 800,
-                    pointerEvents: 'none',
-                    textAlign: 'center',
-                    userSelect: 'none',
-                  }}
-              >
-                arman charan
-              </h1>
-            </div>
+            /> */}
           </div>
 
           {/* Articles. */}
