@@ -1,13 +1,15 @@
-import { GetServerSideProps, NextPage } from "next"
-import styled from "styled-components"
-import { Page } from "../../components/page"
-import { BlogEntry, getEntry, getContentByPageId } from "../../utils/notion"
+import { GetServerSideProps, NextPage } from 'next'
+import styled from 'styled-components'
+import { Page } from '../../ui/page'
+import { BlogEntry, getContentByPageId, getEntry } from '../../utils/notion'
 
 const EntryPage: NextPage<BlogEntry & { error: false } | { error: true }> = props => {
   if (props.error) {
-    return <Page>
-      An unknown error occurred.
-    </Page>
+    return (
+      <Page>
+        An unknown error occurred.
+      </Page>
+    )
   }
 
   return (
@@ -32,12 +34,11 @@ const EntryPage: NextPage<BlogEntry & { error: false } | { error: true }> = prop
 
 export default EntryPage
 
-const Content = styled.div`
+const Content = styled.div `
   line-height: 1.618;
 `
 
 export const getServerSideProps: GetServerSideProps<BlogEntry | {}> = async context => {
-
   const id = String(context.params?.id)
   const [
     entry,
@@ -48,6 +49,6 @@ export const getServerSideProps: GetServerSideProps<BlogEntry | {}> = async cont
   ])
 
   return {
-    props: entry ? { error: false, ...entry, content } : { error: true }
+    props: entry ? { error: false, ...entry, content } : { error: true },
   }
 }

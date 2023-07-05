@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: theme(colors[text]);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+*::selection {
+  background: #f1f4eb;
+}
+
+body {
+  background: theme(colors[background]);
+}
