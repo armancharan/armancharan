@@ -1,27 +1,15 @@
+import { entries } from '../blog/entries'
+import { BlogEntryList } from '../ui/blog_entry_list'
 import { Page } from '../ui/page'
 
 const HomePage = () => {
   return (
     <Page>
-      <ArticleList
-        articles={[]}
+      <BlogEntryList
+        entries={entries}
       />
     </Page>
   )
 }
 
 export default HomePage
-
-const ArticleList = ({ articles }: { articles: [] }) => {
-  return (
-    <div>
-      {articles.map(article => {
-        return <ArticlePreview article={article} />
-      })}
-    </div>
-  )
-}
-
-const ArticlePreview = ({ article }: { article: {} }) => {
-  return <div>Article</div>
-}

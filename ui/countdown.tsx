@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState } from 'react'
 
 const SECOND = 1000
 const MINUTE = SECOND * 60
@@ -18,13 +18,13 @@ export const Countdown: React.ComponentType<{ endDate: Date }> = props => {
     if (typeof window === 'undefined') return
 
     const intervalId = setInterval(() => setNow(new Date()), 1000)
-    
+
     return () => clearInterval(intervalId)
   }, [])
-  
+
   return (
-      <div style={{ fontWeight: 600 }}>
-        {daysRemaining} {hoursRemaining} {minutesRemaining} {secondsRemaining}
-      </div>
+    <div style={{ fontWeight: 600 }}>
+      {daysRemaining} {hoursRemaining} {minutesRemaining} {secondsRemaining}
+    </div>
   )
 }

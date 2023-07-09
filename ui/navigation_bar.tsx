@@ -4,12 +4,15 @@ import { Countdown } from './countdown'
 
 export const NavigationBar = () => {
   return (
-    <div
-      className={`
-        p-4  
-      `}
-    >
-      <Link href="/">
+    <div className="
+        p-4
+      ">
+      <Link
+        className="
+          inline-block
+        "
+        href="/"
+      >
         <Logo />
       </Link>
     </div>
@@ -20,8 +23,8 @@ const Logo = () => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="42"
-      height="44"
+      width="30"
+      height="30"
       fill="none"
       viewBox="0 0 42 44"
     >
