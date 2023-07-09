@@ -84,7 +84,7 @@ const POLLY = {
 
 const FEATHERSTON_NUMERO_IV = {
   id: 'featherston-numero-iv',
-  name: `Some Featherston Numero IV's on the pavement`,
+  name: `Some Featherston Numero IV's We Found On The Road`,
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/featherston-numero-iv.png',
