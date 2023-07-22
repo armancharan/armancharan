@@ -1,43 +1,43 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { BlogEntry } from '../blog/entries'
 
 export const BlogEntryPreview = (
-  {
-    titleAlignment,
-    containerWidthPx,
-    data,
-  }: {
-    titleAlignment: 'center' | 'left' | 'right' | undefined
-    containerWidthPx: number
+  props: {
     data: BlogEntry
   },
 ) => {
-  const href = `/${data.id}`
+  const {
+    data,
+  } = props
 
   return (
     <div className="
-        inline-block
-        group
-        relative
-      " // href={href}
-    >
+      inline-block
+      group
+      relative
+      text-center
+      mx-auto
+      w-[200px]
+    ">
+      {/* Cover Image. */}
       <Image
         alt={data.coverImage.description}
         className="
           m-auto
           mb-2
+          max-w-full
+          object-fit-contain
+          mx-auto
         "
         quality={100}
         height={data.coverImage.height}
         src={data.coverImage.url}
         width={data.coverImage.width}
       />
-      {titleAlignment
-        ? (
-          <h4
-            className={`
-              absolute
+
+      {/* Title. */}
+      <h4
+        className={`
               duration-0
               ease
               opacity-0
@@ -45,20 +45,15 @@ export const BlogEntryPreview = (
               text-ellipsis
               text-sm
               transition-opacity
-              max-w-[${containerWidthPx * 2}px]
-              whitespace-nowrap
+              max-w-[85%]
+              mx-auto
               z-10
-              
-              ${getClassNameForTitleAlignment(titleAlignment)}
-
               group-hover:duration-200
               group-hover:opacity-100
             `}
-          >
-            {data.name}
-          </h4>
-        )
-        : null}
+      >
+        {data.name}
+      </h4>
     </div>
   )
 }

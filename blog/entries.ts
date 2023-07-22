@@ -36,7 +36,7 @@ const JUICED_UP_MI_GORENG = {
 
 const PESTO_PASTA = {
   id: 'pesto-pasta',
-  name: 'Some Delicious Pesto Pasta',
+  name: 'A Bowl of My Delicious Pesto Pasta',
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/pesto-pasta.png',
@@ -48,7 +48,7 @@ const PESTO_PASTA = {
 
 const IVY = {
   id: 'ivy',
-  name: 'Our Most Recent Foster, Ivy',
+  name: 'Ivy, My Most Recent Foster',
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/ivy.png',
@@ -60,7 +60,7 @@ const IVY = {
 
 const WILLOW = {
   id: 'willow',
-  name: 'Our First Foster Cat, Willow',
+  name: 'My First Foster Cat, Willow',
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/willow.png',
@@ -72,7 +72,7 @@ const WILLOW = {
 
 const POLLY = {
   id: 'fostering-cats-part-6',
-  name: 'A Cat We Sat, Polly',
+  name: 'A Cat I Sat, Polly',
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/polly.png',
@@ -84,7 +84,7 @@ const POLLY = {
 
 const FEATHERSTON_NUMERO_IV = {
   id: 'featherston-numero-iv',
-  name: `Some Featherston Numero IV's We Found On The Road`,
+  name: `A Pair of Featherston Numeros On The Street`,
   createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
   coverImage: {
     url: '/featherston-numero-iv.png',
@@ -108,12 +108,12 @@ const createFakeEntry = () => {
 }
 
 export const entries: BlogEntry[] = [
+  POLLY,
   WILLOW,
   LE_PUZZ,
-  POLLY,
   PESTO_PASTA,
-  IVY,
   FEATHERSTON_NUMERO_IV,
+  IVY,
   // JUICED_UP_MI_GORENG,
   // ...Array.from({ length: 50 }, createFakeEntry),
 ]

@@ -5,78 +5,31 @@ import { BlogEntry } from '../blog/entries'
 import { BlogEntryPreview } from './blog_entry_preview'
 
 export const BlogEntryList = ({ entries }: { entries: BlogEntry[] }) => {
-  const [listContainerWidthPx, setListContainerWidth] = useState<number>()
-  const listContainerRef = useRef<HTMLDivElement>(null)
-
-  const previewContainerWidthPx = 100
-  const gapPx = 10
-  const adjustedListWidthPx = listContainerWidthPx != null
-    ? listContainerWidthPx + gapPx
-    : undefined
-  const adjustedPreviewWidthPx = previewContainerWidthPx + gapPx
-  const previewsPerLine = adjustedListWidthPx != null
-    ? Math.floor(adjustedListWidthPx / adjustedPreviewWidthPx)
-    : undefined
-
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    const listContainer = listContainerRef.current
-    if (listContainer == null) {
-      return
-    }
-
-    const updateListContainerWidth = debounce(() => {
-      const width = listContainer.getBoundingClientRect().width
-      setListContainerWidth(width)
-    }, 200)
-
-    window.addEventListener('resize', updateListContainerWidth)
-
-    updateListContainerWidth()
-
-    return () => {
-      window.removeEventListener('resize', updateListContainerWidth)
-    }
-  }, [listContainerRef])
-
   return (
     <div
-      className="
+      className={`
         grid
-        w-full
-      "
-      ref={listContainerRef}
-      style={{
-        gap: `${gapPx}px`,
-        gridTemplateColumns: `repeat(auto-fill, ${previewContainerWidthPx}px)`,
-      }}
+        grid-cols-3
+
+        min-[600px]:grid-cols-5
+      `}
     >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <h1 className={`text-2xl font-medium italic`}>
+          Feels Like the Life I <br />Fiend's a Little Distant<br />(Yeah)
+        </h1>
+      </div>
       {entries.map((entry, index) => {
-        const position = index + 1
-        const isFirstElementInLine = previewsPerLine != null
-          ? position % previewsPerLine === 1
-          : undefined
-        const isLastElementInLine = previewsPerLine != null
-          ? position % previewsPerLine === 0
-          : undefined
-
-        const titleAlignment = listContainerWidthPx != null
-          ? (isFirstElementInLine
-            ? 'left'
-            : isLastElementInLine
-            ? 'right'
-            : 'center')
-          : undefined
-
         return (
           <BlogEntryPreview
-            containerWidthPx={previewContainerWidthPx}
             data={entry}
             key={entry.id}
-            titleAlignment={titleAlignment}
           />
         )
       })}

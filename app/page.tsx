@@ -5,9 +5,11 @@ import { Page } from '../ui/page'
 const HomePage = () => {
   return (
     <Page>
-      <BlogEntryList
+      {
+        /* <BlogEntryList
         entries={entries}
-      />
+      /> */
+      }
     </Page>
   )
 }
