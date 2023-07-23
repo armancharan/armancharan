@@ -2,17 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color: theme(colors[primary]);
-  font-size: 11.5px;
-  line-height: 18px;
-}
-
 *::selection {
   background: #ACACAC;
 }
 
-body {
+:root {
   background: theme(colors[background]);
+  color: theme(colors[primary]);
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
+body {
   overflow-x: hidden;
 }
