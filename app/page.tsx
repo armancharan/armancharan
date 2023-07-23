@@ -37,10 +37,10 @@ const HomePage = () => {
         <em className={caprasimo.className} style={{ letterSpacing: '0.5px' }}>bass</em> better?
       </h1>
       <h1 className="h-30 line leading-[60px] text-5xl font-medium italic text-white">
-        <u>Crank</u> <Image src={'/featherston-numero-iv.png'} /> the <u>bass</u> <b>up</b>!
+        <u>Crank</u> <Image src={'/featherston-numero-iv.png'} /> the <u>bass</u> <b>up</b>
       </h1>
       <h1 className="h-30 line leading-[60px] text-5xl font-medium italic text-white">
-        <em className={merriweather.className}>(Yeah!)</em> <Image src={'/polly.png'} />
+        <em className={merriweather.className}>(Yeah)</em> <Image src={'/polly.png'} />
       </h1>
     </Page>
   )
