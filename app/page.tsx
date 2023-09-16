@@ -1,20 +1,5 @@
-import { Merriweather, Roboto } from 'next/font/google'
-import localFont from 'next/font/local'
 import { twMerge } from 'tailwind-merge'
-import { entries } from '../blog/entries'
-import { BlogEntryList } from '../ui/blog_entry_list'
 import { Page } from '../ui/page'
-
-const caprasimo = localFont({
-  src: '../public/fonts/Caprasimo-Regular.ttf',
-  // style: 'normal',
-})
-
-const merriweather = Merriweather({
-  weight: '700',
-  subsets: ['latin'],
-  style: 'italic',
-})
 
 const HomePage = () => {
   return (
