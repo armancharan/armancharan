@@ -7,12 +7,13 @@
 }
 
 :root {
-  background: theme(colors[background]);
+  background-color: theme(colors[background]);
   color: theme(colors[primary]);
   font-size: 11.5px;
   line-height: 15px;
 }
 
 body {
+  background-color: theme(colors[background]);
   overflow-x: hidden;
 }
