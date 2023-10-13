@@ -9,6 +9,7 @@ import './global.css'
 export const metadata: Metadata = {
   manifest: '/manifest.json',
   title: 'armancharan.com',
+  themeColor: '#000000',
 }
 
 const RootLayout = ({ children }: PropsWithChildren) => {
@@ -16,7 +17,6 @@ const RootLayout = ({ children }: PropsWithChildren) => {
     <html lang="en">
       <Head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <meta name="theme-color" content="#000000" />
       </Head>
       <body>
         <NavigationBar />

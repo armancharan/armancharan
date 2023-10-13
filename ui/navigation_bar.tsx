@@ -5,6 +5,12 @@ import { Countdown } from './countdown'
 export const NavigationBar = () => {
   return (
     <div className="
+        bg-background
+        border-b
+        border-[rgba(255,255,255,.15)]
+        sm:border-none
+        sticky
+        top-0
         p-4
       ">
       <Link
