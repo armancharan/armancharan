@@ -3,7 +3,7 @@
 // the view model. Holding this logic here (not in the React component) keeps it
 // unit-testable and the view thin.
 
-import { DEFAULT_PIECE_RADIUS, shouldUnsolve } from './geometry'
+import { DEFAULT_PIECE_RADIUS, effectivePieceRadius, shouldUnsolve } from './geometry'
 import { shardForSeed } from './shard'
 import type {
   Point,
@@ -56,7 +56,7 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
   const hotOrSolved = solved || s.hot
   const formActive = solved
   const pieceSrc = s.pieceIndex == null ? null : `/pieces/piece-${s.pieceIndex}.webp`
-  const pieceR = s.pieceRadius * s.boardW
+  const pieceR = effectivePieceRadius(s.pieceRadius, s.boardW) * s.boardW
   return {
     phase: s.phase,
     connecting: s.phase === 'connecting',

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  COMPACT_BOARD_PX,
   TAP_SLOP,
   decidePointerUp,
   dist,
+  effectivePieceRadius,
   inZone,
   isTap,
   offBoard,
@@ -29,6 +31,21 @@ describe('isTap', () => {
   })
   it('treats exactly-slop travel as a tap (inclusive)', () => {
     expect(isTap({ x: 0, y: 0 }, { x: TAP_SLOP, y: 0 })).toBe(true)
+  })
+})
+
+describe('effectivePieceRadius', () => {
+  it('leaves desktop-sized boards unchanged', () => {
+    expect(effectivePieceRadius(0.13, 392)).toBe(0.13)
+  })
+  it('enlarges the shard on compact (phone) boards', () => {
+    expect(effectivePieceRadius(0.13, 295)).toBeGreaterThan(0.13)
+  })
+  it('is a no-op before the board is measured', () => {
+    expect(effectivePieceRadius(0.13, 0)).toBe(0.13)
+  })
+  it('does not scale exactly at the breakpoint', () => {
+    expect(effectivePieceRadius(0.13, COMPACT_BOARD_PX)).toBe(0.13)
   })
 })
 

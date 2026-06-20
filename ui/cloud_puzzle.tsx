@@ -11,6 +11,12 @@ const ASPECT = 840 / 630 // portrait source image
 const EDGE_COLD = 'rgba(170,170,170,.85)'
 const EDGE_HOT = 'rgba(255,255,255,.98)'
 
+// Shared geometry/typography for the paired email input + submit button so they
+// stay identical. `rounded-none` + `appearance-none` force square corners even
+// where the platform (Safari) would otherwise round native inputs/buttons.
+const PAIR_CONTROL =
+  'box-border h-[42px] appearance-none rounded-none border border-primary text-[15px] text-primary outline-none'
+
 // Inline trigger that lives in the "coming soon" line and opens the modal.
 export const CloudPuzzleSignup = () => {
   const [open, setOpen] = useState(false)
@@ -60,7 +66,7 @@ const Modal = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[440px] border border-primary bg-background p-6"
+        className="relative w-full max-w-[440px] select-none border border-primary bg-background p-6"
         onClick={e => e.stopPropagation()}
       >
         <button
@@ -255,12 +261,12 @@ const Puzzle = ({ onClose }: { onClose: () => void }) => {
                 value={vm.email}
                 onChange={e => actions.setEmail(e.target.value)}
                 placeholder="you@email.com"
-                className="box-border h-[42px] grow appearance-none border border-primary bg-background px-4 text-[15px] text-primary outline-none placeholder:text-secondary"
+                className={`${PAIR_CONTROL} grow select-text bg-background px-4 placeholder:text-secondary`}
               />
               <button
                 type="submit"
                 disabled={!vm.canSubmit}
-                className="box-border inline-flex h-[42px] items-center justify-center border border-primary px-5 text-[15px] text-primary transition-colors hover:bg-primary hover:text-background"
+                className={`${PAIR_CONTROL} inline-flex items-center justify-center px-5 transition-colors hover:bg-primary hover:text-background`}
               >
                 {vm.submitLabel}
               </button>

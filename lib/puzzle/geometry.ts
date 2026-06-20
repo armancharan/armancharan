@@ -13,6 +13,19 @@ export const DEFAULT_TOLERANCE = 0.06
 // Normalised travel under which a press counts as a click, not a drag.
 export const TAP_SLOP = 0.04
 
+// On compact (phone-sized) boards the shard becomes a small, fiddly touch
+// target, so we scale it up. Desktop boards (the 440px-capped modal yields a
+// ~392px board) stay below the breakpoint untouched; phones (board ≲ 350px)
+// get the larger shard. This only affects rendered size + centring — never the
+// secret target or the tolerance zone, so it can't change puzzle difficulty.
+export const COMPACT_BOARD_PX = 360
+export const COMPACT_PIECE_SCALE = 1.4
+
+// Effective (normalised) shard radius for a given board width. Pure so the view
+// (sizing) and the controller (positioning) derive the exact same value.
+export const effectivePieceRadius = (baseRadius: number, boardW: number): number =>
+  boardW > 0 && boardW < COMPACT_BOARD_PX ? baseRadius * COMPACT_PIECE_SCALE : baseRadius
+
 export const dist = (a: Point, b: Point): number =>
   Math.hypot(a.x - b.x, a.y - b.y)
 

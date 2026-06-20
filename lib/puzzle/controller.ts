@@ -5,7 +5,13 @@
 // subscribes to its store, and forwards pointer events. All branching decisions
 // are delegated to the pure (unit-tested) presenter/geometry functions.
 
-import { decidePointerUp, inZone, START, TAP_SLOP } from './geometry'
+import {
+  decidePointerUp,
+  effectivePieceRadius,
+  inZone,
+  START,
+  TAP_SLOP,
+} from './geometry'
 import { humanError, interpretServerMessage } from './presenter'
 import {
   browserTurnstileService,
@@ -354,7 +360,9 @@ export class PuzzleController {
     const { w, h } = this.dims
     this.pos = { x, y }
     if (!w) return
-    const r = this.radius * w
+    // Same effective radius the view uses to size the shard, so the element's
+    // centre lands exactly on (x, y) — never drifting on compact boards.
+    const r = effectivePieceRadius(this.radius, w) * w
     const piece = this.deps.getPieceEl()
     if (piece) {
       piece.style.transition = animate ? SNAP_TRANSITION : 'transform 0s'
