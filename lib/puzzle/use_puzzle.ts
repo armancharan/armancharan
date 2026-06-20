@@ -21,9 +21,9 @@ export interface UsePuzzleOptions {
 }
 
 export interface PuzzleRefs {
-  board: React.RefObject<HTMLDivElement>
-  piece: React.RefObject<HTMLDivElement>
-  turnstile: React.RefObject<HTMLDivElement>
+  board: React.RefObject<HTMLDivElement | null>
+  piece: React.RefObject<HTMLDivElement | null>
+  turnstile: React.RefObject<HTMLDivElement | null>
 }
 
 export interface PuzzleActions {
@@ -53,7 +53,7 @@ export const usePuzzle = (opts: UsePuzzleOptions): UsePuzzleResult => {
   const piece = useRef<HTMLDivElement>(null)
   const turnstile = useRef<HTMLDivElement>(null)
 
-  const controllerRef = useRef<PuzzleController>()
+  const controllerRef = useRef<PuzzleController | undefined>(undefined)
   if (!controllerRef.current) {
     controllerRef.current = new PuzzleController({
       aspect: opts.aspect,
@@ -74,7 +74,7 @@ export const usePuzzle = (opts: UsePuzzleOptions): UsePuzzleResult => {
   // Tasteful haptic feedback, driven declaratively off view-model transitions.
   // Kept here (not in the controller) so it watches the same derived vm the view
   // renders, and stays clear of the files other work is touching.
-  const hapticsRef = useRef<HapticsService>()
+  const hapticsRef = useRef<HapticsService | undefined>(undefined)
   if (!hapticsRef.current) hapticsRef.current = opts.haptics ?? createHaptics()
   const haptics = hapticsRef.current
 

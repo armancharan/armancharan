@@ -1,20 +1,27 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Site palette (migrated from the v3 tailwind.config.js `theme.colors`).
+   These generate the bg-background / text-primary / text-secondary / border-primary
+   utilities and the matching --color-* variables used below. */
+@theme {
+  --color-background: #000000;
+  --color-primary: #ffffff;
+  --color-secondary: #acacac;
+}
 
 *::selection {
-  background: #ACACAC;
+  background: #acacac;
   color: #000;
 }
 
 :root {
-  background-color: theme(colors[background]);
-  color: theme(colors[primary]);
+  background-color: var(--color-background);
+  color: var(--color-primary);
   font-size: 11.5px;
   line-height: 15px;
 }
 
 body {
-  background-color: theme(colors[background]);
+  background-color: var(--color-background);
   overflow-x: hidden;
 }

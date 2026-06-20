@@ -22,18 +22,6 @@ const LE_PUZZ = {
   },
 }
 
-const JUICED_UP_MI_GORENG = {
-  id: 'juiced-up-mi-goreng',
-  name: 'Juiced-up Mi Goreng',
-  createdAt: new Date('Sat, 08 Jul 2023 24:00:00 GMT'),
-  coverImage: {
-    url: '/juiced-up-mi-goreng.png',
-    width: 100,
-    height: 75,
-    description: 'Juiced-up Mi Goreng',
-  },
-}
-
 const PESTO_PASTA = {
   id: 'pesto-pasta',
   name: 'A Bowl of My Delicious Pesto Pasta',
@@ -114,6 +102,5 @@ export const entries: BlogEntry[] = [
   PESTO_PASTA,
   FEATHERSTON_NUMERO_IV,
   IVY,
-  // JUICED_UP_MI_GORENG,
   // ...Array.from({ length: 50 }, createFakeEntry),
 ]

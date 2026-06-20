@@ -3,7 +3,8 @@ import { mergeConfig } from 'vite'
 
 const config: StorybookConfig = {
   stories: ['../ui/**/*.stories.@(ts|tsx)'],
-  addons: ['@storybook/addon-essentials'],
+  // Storybook 10 folds the former addon-essentials (controls, actions, viewport,
+  // backgrounds, etc.) into core, so no explicit addons are needed here.
   framework: { name: '@storybook/react-vite', options: {} },
   // Serve the Next.js public/ dir so the photo + shard crops resolve.
   staticDirs: ['../public'],

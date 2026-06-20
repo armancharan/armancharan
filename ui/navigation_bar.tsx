@@ -1,6 +1,4 @@
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { Countdown } from './countdown'
 
 export const NavigationBar = () => {
   return (

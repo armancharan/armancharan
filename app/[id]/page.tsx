@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation'
 import { entries } from '../../blog/entries'
 import { Page } from '../../ui/page'
 
-const BlogEntryPage = ({ params }: { params: { id: string } }) => {
-  const entry = entries.find(entry => entry.id === params.id)
+const BlogEntryPage = async ({ params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params
+  const entry = entries.find(entry => entry.id === id)
 
   if (entry == null) {
     return notFound()

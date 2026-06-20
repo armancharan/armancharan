@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type JSX } from 'react'
 import { selectViewModel } from '../lib/puzzle/presenter'
 import { initialPuzzleState, puzzleReducer } from '../lib/puzzle/store'
 import type { PuzzleAction, PuzzleState } from '../lib/puzzle/types'
