@@ -1,3 +1,14 @@
 .env
+.env*.local
 .next
 node_modules
+.data
+.dev.vars
+.wrangler
+.vercel
+.DS_Store
+*.tsbuildinfo
+
+# Secret puzzle answer coordinates — generated locally, deployed to the Worker,
+# never committed (this repo is public). Regenerate with scripts/generate-pieces.mjs.
+worker/src/targets.json

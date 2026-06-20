@@ -28,9 +28,13 @@
     "@types/react": "^18.0.14",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.24",
-    "tailwindcss": "^3.3.2"
+    "sharp": "^0.35.2",
+    "tailwindcss": "^3.3.2",
+    "vitest": "^2.1.9"
   },
   "scripts": {
-    "develop": "yarn run next"
+    "develop": "yarn run next",
+    "test": "vitest run",
+    "test:watch": "vitest"
   }
 }

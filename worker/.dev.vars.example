@@ -1,0 +1,5 @@
+# Copy to worker/.dev.vars for local `wrangler dev`.
+# PUZZLE_SECRET must match the Next app's PUZZLE_SECRET so solve tokens verify.
+PUZZLE_SECRET=dev-only-insecure-puzzle-secret
+# Optional comma-separated origin allowlist; leave empty to allow all (dev).
+ALLOWED_ORIGINS=

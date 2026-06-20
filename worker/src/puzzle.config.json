@@ -1,0 +1,8 @@
+{
+  "radius": 0.13,
+  "tolerance": 0.06,
+  "count": 9,
+  "minSpacing": 0.05,
+  "region": { "x": [0.14, 0.86], "y": [0.335, 0.365] },
+  "note": "Hand-edited config. Shards are sampled ONLY from `region` (normalised 0..1 box of the photo). For nuke-cloud this is a thin band along the horizon (y ~0.35 +/- a few px) spanning most of the width, so the trick is guessing WHERE along the horizon a shard belongs; `tolerance` gives vertical/horizontal leeway so it isn't bland. Other photos will want a different region. After editing, run `node scripts/generate-pieces.mjs` to resample targets + regenerate crops (writes worker/src/targets.json + public/pieces)."
+}

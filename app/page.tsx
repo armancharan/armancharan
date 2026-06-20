@@ -1,4 +1,11 @@
+import NextImage, { type StaticImageData } from 'next/image'
 import { twMerge } from 'tailwind-merge'
+import agenticEngineering101 from '../public/agentic-engineering-101.png'
+import featherstonNumeroIv from '../public/featherston-numero-iv.png'
+import ivySmiling from '../public/ivy-smiling.png'
+import pestoPasta from '../public/pesto-pasta.png'
+import polly from '../public/polly.png'
+import { CloudPuzzleSignup } from '../ui/cloud_puzzle'
 import { Page } from '../ui/page'
 
 const HomePage = () => {
@@ -6,18 +13,32 @@ const HomePage = () => {
     <Page>
       <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
         "Oh, <Bass />, cool"
-        <Image className={'h-16'} src={'/ivy-smiling.png'} />
+        <Image className={'h-16'} src={ivySmiling} />
       </h1>
       <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
         You know how you
-        <Image src={'/pesto-pasta.png'} /> make the <Bass /> better?
+        <Image src={pestoPasta} /> make the <Bass /> better?
       </h1>
       <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
-        Crank <Image src={'/featherston-numero-iv.png'} /> the <Bass /> up
+        Crank <Image src={featherstonNumeroIv} /> the <Bass /> up
       </h1>
       <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
-        (Yeah) <Image src={'/polly.png'} />
+        (Yeah) <Image src={polly} />
       </h1>
+
+      <section className="mt-32">
+        <p className="text-secondary text-[13px] mb-4">
+          {'coming soon \u2014 agentic engineering 101 \u2014 '}
+          <CloudPuzzleSignup />
+        </p>
+        <NextImage
+          src={agenticEngineering101}
+          alt="agentic engineering 101"
+          placeholder="blur"
+          sizes="(max-width: 896px) 100vw, 896px"
+          className="border-2 border-[rgba(0,0,0,0.333)] w-full max-w-4xl h-auto"
+        />
+      </section>
     </Page>
   )
 }
@@ -26,12 +47,16 @@ export default HomePage
 
 const Image: React.ComponentType<{
   className?: string
-  src: string
-}> = ({
-  className,
-  src,
-}) => {
-  return <img className={twMerge('max-h-full m-4 inline h-20', className)} src={src} />
+  src: StaticImageData
+}> = ({ className, src }) => {
+  return (
+    <NextImage
+      src={src}
+      alt=""
+      sizes="320px"
+      className={twMerge('max-h-full m-4 inline h-20 w-auto', className)}
+    />
+  )
 }
 
 const Bass = () => {

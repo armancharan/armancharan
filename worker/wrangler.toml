@@ -1,0 +1,20 @@
+name = "arman-puzzle"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# The puzzle session lives in a Durable Object. SQLite-backed classes are the
+# current default and are required for the WebSocket hibernation API used here.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PuzzleRoom"]
+
+[[durable_objects.bindings]]
+name = "PUZZLE_ROOM"
+class_name = "PuzzleRoom"
+
+[observability]
+enabled = true
+
+# Secrets (set with `wrangler secret put` in production, or worker/.dev.vars locally):
+#   PUZZLE_SECRET    — must match the Vercel PUZZLE_SECRET so solve tokens verify
+#   ALLOWED_ORIGINS  — comma-separated allowlist (e.g. https://armancharan.com); empty = allow all
