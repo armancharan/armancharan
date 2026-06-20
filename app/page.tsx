@@ -27,10 +27,10 @@ const HomePage = () => {
       </h1>
 
       <section className="mt-32">
-        <p className="text-secondary text-[13px] mb-4">
+        <div className="text-secondary text-[13px] mb-4">
           {'coming soon \u2014 agentic engineering 101 \u2014 '}
           <CloudPuzzleSignup />
-        </p>
+        </div>
         <NextImage
           src={agenticEngineering101}
           alt="agentic engineering 101"
