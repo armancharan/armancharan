@@ -11,18 +11,18 @@ import { Page } from '../ui/page'
 const HomePage = () => {
   return (
     <Page>
-      <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
+      <h1 className="flex items-center flex-wrap justify-start min-h-30 line leading-[60px] text-5xl font-medium italic text-white">
         "Oh, <Bass />, cool"
         <Image className={'h-16'} src={ivySmiling} />
       </h1>
-      <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
+      <h1 className="flex items-center flex-wrap justify-start min-h-30 line leading-[60px] text-5xl font-medium italic text-white">
         You know how you
         <Image src={pestoPasta} /> make the <Bass /> better?
       </h1>
-      <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
+      <h1 className="flex items-center flex-wrap justify-start min-h-30 line leading-[60px] text-5xl font-medium italic text-white">
         Crank <Image src={featherstonNumeroIv} /> the <Bass /> up
       </h1>
-      <h1 className="flex items-center flex-wrap justify-start h-30 line leading-[60px] text-5xl font-medium italic text-white">
+      <h1 className="flex items-center flex-wrap justify-start min-h-30 line leading-[60px] text-5xl font-medium italic text-white">
         (Yeah) <Image src={polly} />
       </h1>
 
