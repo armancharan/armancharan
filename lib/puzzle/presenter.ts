@@ -64,9 +64,10 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
     error: s.error,
     shardWhite: hotOrSolved,
     shadeHidden: hotOrSolved,
-    // The scramble is only ever lifted by the explicit reveal toggle (a click),
-    // never by hovering or by merely moving the shard.
-    showFuzz: !s.revealed,
+    // The scramble is lifted by the explicit reveal toggle (a click) OR while the
+    // shard is actively being dragged (so you always see what you're placing).
+    // Never by hovering.
+    showFuzz: !s.revealed && !s.dragging,
     pieceVisible: s.phase !== 'connecting' && s.boardW > 0 && pieceSrc != null,
     pieceSrc,
     shard: shardForSeed(s.pieceSeed),

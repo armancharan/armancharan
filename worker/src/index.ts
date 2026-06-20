@@ -13,6 +13,8 @@ export interface Env {
   PUZZLE_ROOM: DurableObjectNamespace
   PUZZLE_SECRET: string
   ALLOWED_ORIGINS?: string
+  DB: D1Database
+  TURNSTILE_SECRET?: string
 }
 
 const TARGETS = config.targets as Array<{ x: number; y: number }>
@@ -219,12 +221,195 @@ export class PuzzleRoom {
   }
 }
 
+// --- signup endpoint -------------------------------------------------------
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const SOLVE_TTL_MS = 3 * 60 * 1000 // must match the token's iat window
+
+// Per-isolate, per-IP throttle. A first line of defence paired with the
+// single-use solve token; not a global guarantee.
+const rl = new Map<string, { n: number; reset: number }>()
+const rateLimit = (key: string, limit: number, windowMs: number): boolean => {
+  const now = Date.now()
+  const e = rl.get(key)
+  if (!e || e.reset < now) {
+    rl.set(key, { n: 1, reset: now + windowMs })
+    return true
+  }
+  if (e.n >= limit) return false
+  e.n += 1
+  return true
+}
+
+const corsHeaders = (origin: string): Record<string, string> => ({
+  'Access-Control-Allow-Origin': origin || '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  Vary: 'Origin',
+})
+
+const jsonResponse = (
+  obj: unknown,
+  status: number,
+  origin: string,
+): Response =>
+  new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'content-type': 'application/json', ...corsHeaders(origin) },
+  })
+
+const fromB64url = (s: string): string => {
+  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new TextDecoder().decode(bytes)
+}
+
+type TokenCheck =
+  | { ok: true; jti: string; expiresAt: number }
+  | { ok: false; reason: string }
+
+// Verify the HMAC + claims of a token we minted. Single-use is enforced
+// separately (durably) against D1.
+const verifySolveToken = async (
+  token: string | undefined,
+  secret: string,
+): Promise<TokenCheck> => {
+  if (!token) return { ok: false, reason: 'missing' }
+  const [p, sig] = token.split('.')
+  if (!p || !sig) return { ok: false, reason: 'malformed' }
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const expected = b64url(
+    new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(p))),
+  )
+  if (expected !== sig) return { ok: false, reason: 'bad_sig' }
+
+  try {
+    const payload = JSON.parse(fromB64url(p)) as {
+      v?: number
+      iat?: number
+      jti?: string
+    }
+    if (payload.v !== 1) return { ok: false, reason: 'bad_version' }
+    if (typeof payload.iat !== 'number') return { ok: false, reason: 'bad_iat' }
+    if (typeof payload.jti !== 'string') return { ok: false, reason: 'bad_jti' }
+    if (Date.now() - payload.iat > SOLVE_TTL_MS) return { ok: false, reason: 'expired' }
+    return { ok: true, jti: payload.jti, expiresAt: payload.iat + SOLVE_TTL_MS }
+  } catch {
+    return { ok: false, reason: 'bad_payload' }
+  }
+}
+
+const verifyTurnstile = async (
+  secret: string | undefined,
+  token: unknown,
+  ip: string,
+): Promise<boolean> => {
+  if (!secret) return true // not configured → skip (parity with dev)
+  if (typeof token !== 'string' || !token) return false
+  const body = new URLSearchParams()
+  body.set('secret', secret)
+  body.set('response', token)
+  if (ip && ip !== 'unknown') body.set('remoteip', ip)
+  const res = await fetch(
+    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+    { method: 'POST', body },
+  )
+  const data = (await res.json()) as { success?: boolean }
+  return Boolean(data.success)
+}
+
+const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
+  const origin = req.headers.get('Origin') || ''
+
+  if (req.method === 'OPTIONS') {
+    if (!originAllowed(req, env)) return new Response('forbidden origin', { status: 403 })
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+  if (!originAllowed(req, env)) return new Response('forbidden origin', { status: 403 })
+  if (req.method !== 'POST') return jsonResponse({ ok: false, reason: 'method' }, 405, origin)
+
+  const ip = req.headers.get('CF-Connecting-IP') || 'unknown'
+  if (!rateLimit(`sub:${ip}`, 5, 60_000)) {
+    return jsonResponse({ ok: false, reason: 'rate_limited' }, 429, origin)
+  }
+
+  let body: {
+    email?: string
+    website?: string
+    turnstileToken?: string
+    solveToken?: string
+  }
+  try {
+    body = await req.json()
+  } catch {
+    return jsonResponse({ ok: false, reason: 'invalid_json' }, 400, origin)
+  }
+
+  // Honeypot: a real user never fills the hidden field.
+  if (body.website) return jsonResponse({ ok: false, reason: 'rejected' }, 400, origin)
+
+  const email = (body.email ?? '').trim().toLowerCase()
+  if (!email || !EMAIL.test(email)) {
+    return jsonResponse({ ok: false, reason: 'invalid_email' }, 400, origin)
+  }
+
+  if (!(await verifyTurnstile(env.TURNSTILE_SECRET, body.turnstileToken, ip))) {
+    return jsonResponse({ ok: false, reason: 'turnstile_failed' }, 400, origin)
+  }
+
+  // Verify the solve token's signature/claims, then burn it against replay.
+  const tok = await verifySolveToken(body.solveToken, env.PUZZLE_SECRET)
+  if (!tok.ok) return jsonResponse({ ok: false, reason: `puzzle_${tok.reason}` }, 400, origin)
+
+  const now = Date.now()
+  try {
+    await env.DB.prepare('DELETE FROM used_solve_tokens WHERE expires_at < ?')
+      .bind(now)
+      .run()
+    const claimed = await env.DB.prepare(
+      'INSERT INTO used_solve_tokens (jti, expires_at) VALUES (?, ?) ON CONFLICT(jti) DO NOTHING',
+    )
+      .bind(tok.jti, tok.expiresAt)
+      .run()
+    if ((claimed.meta?.changes ?? 0) === 0) {
+      return jsonResponse({ ok: false, reason: 'puzzle_replay' }, 400, origin)
+    }
+  } catch (err) {
+    return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
+  }
+
+  try {
+    const ua = req.headers.get('user-agent') || ''
+    const res = await env.DB.prepare(
+      'INSERT INTO subscribers (email, source, user_agent, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING',
+    )
+      .bind(email, 'agentic-engineering-101', ua, new Date().toISOString())
+      .run()
+    const duplicate = (res.meta?.changes ?? 0) === 0
+    return jsonResponse({ ok: true, duplicate }, 200, origin)
+  } catch (err) {
+    return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
 
     if (url.pathname === '/health') {
       return new Response('ok', { headers: { 'content-type': 'text/plain' } })
+    }
+
+    if (url.pathname === '/subscribe') {
+      return handleSubscribe(req, env)
     }
 
     if (url.pathname !== '/puzzle') {

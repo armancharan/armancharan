@@ -41,11 +41,23 @@ export interface SubscribeService {
   submit: (req: SubscribeRequest) => Promise<SubscribeResult>
 }
 
-// Talks to the Next API route. The route re-checks rate limit, honeypot,
-// Turnstile, and the (single-use) solve token server-side.
+// The signup endpoint lives on the Worker (native D1 binding), derived from the
+// puzzle WS URL: wss://host/puzzle → https://host/subscribe. Falls back to the
+// same-origin Next route only if no WS URL is configured.
+const subscribeUrl = (): string => {
+  const ws = process.env.NEXT_PUBLIC_PUZZLE_WS_URL
+  if (ws) return ws.replace(/^ws/, 'http').replace(/\/puzzle$/, '/subscribe')
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:8799/subscribe'
+  }
+  return '/api/subscribe'
+}
+
+// Posts the signup to the Worker, which re-checks rate limit, honeypot,
+// Turnstile, and the (single-use) solve token server-side before writing to D1.
 export const httpSubscribeService: SubscribeService = {
   submit: async req => {
-    const res = await fetch('/api/subscribe', {
+    const res = await fetch(subscribeUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

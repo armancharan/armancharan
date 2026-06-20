@@ -12,6 +12,13 @@ new_sqlite_classes = ["PuzzleRoom"]
 name = "PUZZLE_ROOM"
 class_name = "PuzzleRoom"
 
+# Subscriber storage. The /subscribe endpoint writes signups here directly via
+# the native binding (no API token, no read-only-filesystem fallback).
+[[d1_databases]]
+binding = "DB"
+database_name = "arman-subscribers"
+database_id = "17a3fc5e-8882-41a0-b438-40df97ec9c26"
+
 [observability]
 enabled = true
 

@@ -91,12 +91,16 @@ describe('selectViewModel', () => {
     })
   })
 
-  it('dragging the shard does NOT lift the scramble (no hover/move reveal)', () => {
+  it('lifts the scramble while the shard is actively dragged', () => {
     const dragging = puzzleReducer(
       puzzleReducer(playing, { type: 'dragStart' }),
       { type: 'dragMoved' },
     )
-    expect(selectViewModel(dragging).showFuzz).toBe(true)
+    expect(selectViewModel(dragging).showFuzz).toBe(false)
+  })
+
+  it('shows the scramble at rest before any reveal toggle (no hover reveal)', () => {
+    expect(selectViewModel(playing).showFuzz).toBe(true)
   })
 
   it('only the explicit reveal toggle lifts the fuzz', () => {
