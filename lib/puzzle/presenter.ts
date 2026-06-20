@@ -62,6 +62,7 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
     connecting: s.phase === 'connecting',
     done: s.phase === 'done',
     error: s.error,
+    errorRetry: s.errorRetry,
     shardWhite: hotOrSolved,
     shadeHidden: hotOrSolved,
     // The scramble is lifted by the explicit reveal toggle (a click) OR while the
@@ -91,15 +92,21 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
 // Map an API failure reason to friendly copy. Pure, so it lives with the rest of
 // the presentation logic rather than in the component.
 export const humanError = (reason?: string): string => {
-  if (!reason) return 'something went wrong, try again'
+  if (!reason) return 'something went wrong'
   if (reason === 'invalid_email') return 'that email looks off'
   if (reason === 'rate_limited') return 'easy there \u2014 try again in a minute'
   if (reason.startsWith('turnstile')) return 'bot check failed, refresh and retry'
-  if (reason.startsWith('puzzle')) return 'puzzle check expired, give it another go'
+  if (reason.startsWith('puzzle')) return 'puzzle check expired'
   if (reason === 'storage_error')
     return 'signups aren\u2019t live yet \u2014 check back soon'
-  return 'something went wrong, try again'
+  return 'something went wrong'
 }
+
+// Whether an API failure is remedied by re-running the puzzle (a fresh solve
+// mints a new single-use token). Only the puzzle-token checks qualify — a bad
+// email or rate-limit isn't fixed by re-solving.
+export const isRetryableReason = (reason?: string): boolean =>
+  reason?.startsWith('puzzle') ?? false
 
 // During a drag, decide whether a solved shard has been pulled out of the zone.
 export const resolvePointerMove = (

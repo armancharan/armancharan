@@ -8,7 +8,9 @@ node_modules
 .vercel
 .DS_Store
 *.tsbuildinfo
+.npmrc
 
 # Secret puzzle answer coordinates — generated locally, deployed to the Worker,
 # never committed (this repo is public). Regenerate with scripts/generate-pieces.mjs.
 worker/src/targets.json
+cloudflared/

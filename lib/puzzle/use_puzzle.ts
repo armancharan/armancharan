@@ -8,12 +8,16 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { PuzzleController, type PuzzleControllerDeps } from './controller'
+import { createHaptics, type HapticsService } from './haptics'
 import { selectViewModel } from './presenter'
 import type { Point, PuzzleViewModel } from './types'
 
 export interface UsePuzzleOptions {
   aspect: number
   deps?: Partial<Omit<PuzzleControllerDeps, 'aspect' | 'getBoardEl' | 'getPieceEl'>>
+  // Injectable so it can be stubbed/disabled in tests; defaults to the real
+  // browser-backed service (no-ops on unsupported devices / reduced-motion).
+  haptics?: HapticsService
 }
 
 export interface PuzzleRefs {
@@ -30,6 +34,7 @@ export interface PuzzleActions {
   toggleBgFocus: () => void
   setEmail: (email: string) => void
   submit: (honeypot: string) => void
+  retry: () => void
 }
 
 export interface UsePuzzleResult {
@@ -66,8 +71,57 @@ export const usePuzzle = (opts: UsePuzzleOptions): UsePuzzleResult => {
   )
   const vm = selectViewModel(state)
 
-  // Open the socket once on mount.
-  useEffect(() => controller.connect(), [controller])
+  // Tasteful haptic feedback, driven declaratively off view-model transitions.
+  // Kept here (not in the controller) so it watches the same derived vm the view
+  // renders, and stays clear of the files other work is touching.
+  const hapticsRef = useRef<HapticsService>()
+  if (!hapticsRef.current) hapticsRef.current = opts.haptics ?? createHaptics()
+  const haptics = hapticsRef.current
+
+  const prev = useRef({
+    dragging: vm.dragging,
+    shardWhite: vm.shardWhite,
+    solved: vm.solved,
+    done: vm.done,
+    error: vm.error,
+    errorRetry: vm.errorRetry,
+  })
+
+  useEffect(() => {
+    const p = prev.current
+    if (!p.dragging && vm.dragging) haptics.grab() // grab: pick up the shard
+    if (!p.shardWhite && vm.shardWhite) haptics.hot() // enter the on-target zone
+    else if (p.shardWhite && !vm.shardWhite) haptics.cold() // leave it
+    if (!p.solved && vm.solved) haptics.solved() // puzzle solved
+    if (!p.done && vm.done) haptics.success() // signup confirmed
+    // a fresh, retryable error (ignore re-renders of the same error)
+    if (vm.error && vm.errorRetry && (p.error !== vm.error || !p.errorRetry)) {
+      haptics.error()
+    }
+    prev.current = {
+      dragging: vm.dragging,
+      shardWhite: vm.shardWhite,
+      solved: vm.solved,
+      done: vm.done,
+      error: vm.error,
+      errorRetry: vm.errorRetry,
+    }
+  }, [
+    haptics,
+    vm.dragging,
+    vm.shardWhite,
+    vm.solved,
+    vm.done,
+    vm.error,
+    vm.errorRetry,
+  ])
+
+  // Open the socket on mount; dispose whatever socket is current on unmount
+  // (the controller may have replaced it via retry()).
+  useEffect(() => {
+    controller.connect()
+    return () => controller.dispose()
+  }, [controller])
 
   // Measure the board and keep the shard pinned through resizes.
   useEffect(() => {
@@ -91,6 +145,7 @@ export const usePuzzle = (opts: UsePuzzleOptions): UsePuzzleResult => {
       toggleBgFocus: controller.toggleBgFocus,
       setEmail: controller.setEmail,
       submit: controller.submit,
+      retry: controller.retry,
     }),
     [controller],
   )

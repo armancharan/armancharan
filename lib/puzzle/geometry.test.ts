@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  COMPACT_BOARD_PX,
   TAP_SLOP,
   decidePointerUp,
   dist,
@@ -35,17 +34,12 @@ describe('isTap', () => {
 })
 
 describe('effectivePieceRadius', () => {
-  it('leaves desktop-sized boards unchanged', () => {
-    expect(effectivePieceRadius(0.13, 392)).toBe(0.13)
+  it('renders the shard 1:1 with its captured radius (no magnification)', () => {
+    expect(effectivePieceRadius(0.184, 392)).toBe(0.184)
+    expect(effectivePieceRadius(0.184, 295)).toBe(0.184)
   })
-  it('enlarges the shard on compact (phone) boards', () => {
-    expect(effectivePieceRadius(0.13, 295)).toBeGreaterThan(0.13)
-  })
-  it('is a no-op before the board is measured', () => {
-    expect(effectivePieceRadius(0.13, 0)).toBe(0.13)
-  })
-  it('does not scale exactly at the breakpoint', () => {
-    expect(effectivePieceRadius(0.13, COMPACT_BOARD_PX)).toBe(0.13)
+  it('is independent of board width', () => {
+    expect(effectivePieceRadius(0.184, 800)).toBe(effectivePieceRadius(0.184, 200))
   })
 })
 
@@ -123,6 +117,19 @@ describe('decidePointerUp', () => {
           centre: { x: 1.3, y: 0.5 },
         }),
       ).toEqual({ reveal: false, placement: { kind: 'dissolve' } })
+    })
+
+    it('a round-trip drag back to the origin is NOT a tap when moved latched', () => {
+      // Net displacement is ~0 (down ≈ up), so displacement alone reads as a tap;
+      // the path-aware `moved` flag must veto the reveal.
+      const args = {
+        ...base,
+        down: { x: 0.5, y: 0.7 },
+        up: { x: 0.5, y: 0.7 },
+        centre: { x: 0.5, y: 0.7 },
+      }
+      expect(decidePointerUp(args).reveal).toBe(true) // net-displacement view
+      expect(decidePointerUp({ ...args, moved: true }).reveal).toBe(false)
     })
   })
 

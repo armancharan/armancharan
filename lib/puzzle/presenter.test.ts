@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { effectivePieceRadius } from './geometry'
 import {
   humanError,
   interpretServerMessage,
+  isRetryableReason,
   resolvePointerMove,
   selectViewModel,
 } from './presenter'
@@ -120,7 +122,7 @@ describe('selectViewModel', () => {
     const vm = selectViewModel(measured)
     expect(vm.pieceSrc).toBe('/pieces/piece-0.webp')
     expect(vm.pieceVisible).toBe(true)
-    expect(vm.pieceSizePx).toBeCloseTo(0.13 * 400 * 2)
+    expect(vm.pieceSizePx).toBeCloseTo(effectivePieceRadius(0.13, 400) * 400 * 2)
   })
 
   it('piece is not visible before the board is measured', () => {
@@ -148,8 +150,19 @@ describe('humanError', () => {
     expect(humanError('turnstile_failed')).toContain('bot check')
     expect(humanError('puzzle_expired')).toContain('puzzle')
     expect(humanError('storage_error')).toContain('check back')
-    expect(humanError('something_unmapped')).toBe('something went wrong, try again')
-    expect(humanError(undefined)).toBe('something went wrong, try again')
+    expect(humanError('something_unmapped')).toBe('something went wrong')
+    expect(humanError(undefined)).toBe('something went wrong')
+  })
+})
+
+describe('isRetryableReason', () => {
+  it('flags only puzzle-token failures (a fresh solve fixes those)', () => {
+    expect(isRetryableReason('puzzle_expired')).toBe(true)
+    expect(isRetryableReason('puzzle_replay')).toBe(true)
+    expect(isRetryableReason('invalid_email')).toBe(false)
+    expect(isRetryableReason('rate_limited')).toBe(false)
+    expect(isRetryableReason('turnstile_failed')).toBe(false)
+    expect(isRetryableReason(undefined)).toBe(false)
   })
 })
 

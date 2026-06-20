@@ -4,6 +4,7 @@
 // — and tests can inject fakes.
 
 import { track } from '@vercel/analytics'
+import { puzzleWsUrl, subscribeUrl } from './endpoints'
 
 declare global {
   interface Window {
@@ -41,18 +42,9 @@ export interface SubscribeService {
   submit: (req: SubscribeRequest) => Promise<SubscribeResult>
 }
 
-// The signup endpoint lives on the Worker (native D1 binding), derived from the
-// puzzle WS URL: wss://host/puzzle → https://host/subscribe. Falls back to the
-// same-origin Next route only if no WS URL is configured.
-const subscribeUrl = (): string => {
-  const ws = process.env.NEXT_PUBLIC_PUZZLE_WS_URL
-  if (ws) return ws.replace(/^ws/, 'http').replace(/\/puzzle$/, '/subscribe')
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return 'http://localhost:8799/subscribe'
-  }
-  return '/api/subscribe'
-}
-
+// The signup endpoint lives on the Worker (native D1 binding) and is derived
+// from the same shared base as the WebSocket (see ./endpoints).
+//
 // Posts the signup to the Worker, which re-checks rate limit, honeypot,
 // Turnstile, and the (single-use) solve token server-side before writing to D1.
 export const httpSubscribeService: SubscribeService = {
@@ -127,13 +119,6 @@ export interface PuzzleConfig {
 // Object, which sends a shard by INDEX only and, on a legitimate drop, a signed
 // token. The index -> coordinate mapping lives only on the server.
 export const defaultPuzzleConfig: PuzzleConfig = {
-  wsUrl: () => {
-    const env = process.env.NEXT_PUBLIC_PUZZLE_WS_URL
-    if (env) return env
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      return 'ws://localhost:8799/puzzle'
-    }
-    return ''
-  },
+  wsUrl: puzzleWsUrl,
   siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
 }

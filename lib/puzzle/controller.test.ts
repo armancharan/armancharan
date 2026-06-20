@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PuzzleController } from './controller'
+import type { LoggingService } from './logging'
 import { selectViewModel } from './presenter'
 import type {
   AnalyticsService,
@@ -28,15 +29,17 @@ const makeController = (opts: {
       tracked.push([e, p])
     },
   }
+  const logger: LoggingService = { logError: vi.fn() }
   const controller = new PuzzleController({
     aspect: 1,
     getBoardEl: () => null,
     getPieceEl: () => null,
     subscribe,
     analytics,
+    logger,
     config: { wsUrl: () => '', siteKey: undefined },
   })
-  return { controller, calls, tracked }
+  return { controller, calls, tracked, logger }
 }
 
 const arriveAtSolved = (controller: PuzzleController, email = 'me@x.co') => {
@@ -101,8 +104,19 @@ describe('PuzzleController.submit', () => {
     arriveAtSolved(controller)
     await controller.submit('')
     const s = controller.store.getState()
-    expect(s.error).toBe('something went wrong, try again')
+    expect(s.error).toBe('something went wrong')
     expect(s.submitting).toBe(false)
+  })
+
+  it('logs the underlying error when submit throws', async () => {
+    const { controller, logger } = makeController({ throws: true })
+    arriveAtSolved(controller)
+    await controller.submit('')
+    expect(logger.logError).toHaveBeenCalledWith(
+      'submit',
+      expect.any(Error),
+      expect.objectContaining({ project: 'agentic-engineering-101' }),
+    )
   })
 
   it('ignores a second submit while one is in flight', async () => {
@@ -126,6 +140,62 @@ describe('PuzzleController.submit', () => {
     resolve({ ok: true })
     await first
     expect(controller.store.getState().phase).toBe('done')
+  })
+})
+
+describe('PuzzleController.connect error logging', () => {
+  it('logs the cause when the WebSocket constructor throws', () => {
+    const logger: LoggingService = { logError: vi.fn() }
+    const g = globalThis as unknown as { WebSocket?: unknown }
+    const prev = g.WebSocket
+    g.WebSocket = class {
+      constructor() {
+        throw new Error('boom')
+      }
+    }
+    try {
+      const controller = new PuzzleController({
+        aspect: 1,
+        getBoardEl: () => null,
+        getPieceEl: () => null,
+        analytics: { track: () => {} },
+        logger,
+        config: { wsUrl: () => 'wss://example.test/puzzle', siteKey: undefined },
+      })
+      controller.connect()
+    } finally {
+      g.WebSocket = prev
+    }
+    expect(logger.logError).toHaveBeenCalledWith(
+      'connect',
+      expect.any(Error),
+      expect.objectContaining({ url: 'wss://example.test/puzzle' }),
+    )
+  })
+})
+
+describe('PuzzleController.retry', () => {
+  it('resets a solved-but-rejected session and reconnects for a new token', () => {
+    const { controller } = makeController({})
+    arriveAtSolved(controller)
+    controller.store.dispatch({ type: 'setBoardWidth', width: 320 })
+    // an expired-token rejection leaves a retryable error on a solved session
+    controller.store.dispatch({
+      type: 'error',
+      message: 'puzzle check expired',
+      retry: true,
+    })
+    expect(selectViewModel(controller.store.getState()).errorRetry).toBe(true)
+
+    controller.retry()
+
+    const s = controller.store.getState()
+    expect(s.token).toBeNull() // stale token dropped
+    expect(s.target).toBeNull()
+    expect(s.won).toBe(false)
+    expect(s.email).toBe('me@x.co') // preserved across the reset
+    expect(s.boardW).toBe(320) // preserved across the reset
+    expect(s.phase).toBe('connecting') // reconnecting for a fresh challenge
   })
 })
 
@@ -252,6 +322,105 @@ describe('PuzzleController drag-to-unset (local, post-win)', () => {
     expect(selectViewModel(s).formActive).toBe(true)
   })
 
+  it('keeps the shard under the pointer when the page scrolls mid-drag', () => {
+    // Regression: a scroll moves the board (and the board-anchored shard) without
+    // firing a pointermove. If we keep re-applying the pre-scroll sample, the
+    // shard drifts away from the finger by the scroll delta. The controller must
+    // re-derive its position from the live pointer + a fresh rect on scroll.
+    let rafCb: ((t: number) => void) | undefined
+    const g = globalThis as unknown as {
+      requestAnimationFrame: (cb: (t: number) => void) => number
+      cancelAnimationFrame: (id: number) => void
+      window?: unknown
+    }
+    g.requestAnimationFrame = cb => {
+      rafCb = cb
+      return 1
+    }
+    g.cancelAnimationFrame = () => {
+      rafCb = undefined
+    }
+    const flush = () => {
+      const cb = rafCb
+      rafCb = undefined
+      cb?.(0)
+    }
+
+    // Fake window so the drag's scroll listener can be captured and fired.
+    const scrollListeners: Array<() => void> = []
+    const prevWindow = g.window
+    g.window = {
+      addEventListener: (type: string, cb: () => void) => {
+        if (type === 'scroll') scrollListeners.push(cb)
+      },
+      removeEventListener: (type: string, cb: () => void) => {
+        if (type === 'scroll') {
+          const i = scrollListeners.indexOf(cb)
+          if (i >= 0) scrollListeners.splice(i, 1)
+        }
+      },
+    }
+
+    // Mutable rect: top moves up by the scroll delta, mimicking a page scroll.
+    const rectState = { left: 0, top: 0, width: 100, height: 100 }
+    const piece = { style: {} as Record<string, string> }
+    const board = {
+      clientWidth: 100,
+      getBoundingClientRect: () => ({ ...rectState }),
+    }
+    const controller = new PuzzleController({
+      aspect: 1,
+      getBoardEl: () => board as unknown as HTMLElement,
+      getPieceEl: () => piece as unknown as HTMLElement,
+      config: { wsUrl: () => '', siteKey: undefined },
+      analytics: { track: () => {} },
+    })
+    controller.setBoardWidth(100)
+    controller.store.dispatch({
+      type: 'ready',
+      index: 0,
+      seed: 1,
+      radius: 0.13,
+      tolerance: 0.06,
+    })
+
+    const evt = (x: number, y: number) =>
+      ({
+        clientX: x,
+        clientY: y,
+        pointerId: 1,
+        currentTarget: { setPointerCapture: () => {} } as unknown as Element,
+      }) as const
+    const translateY = () => {
+      const m = /translate3d\([^,]+,\s*([-\d.]+)px/.exec(piece.style.transform)
+      return m ? parseFloat(m[1]) : NaN
+    }
+
+    // Grab the shard at its resting centre (offset 0) and let the pump place it.
+    controller.onPointerDown(evt(50, 75.6))
+    flush()
+    const before = translateY()
+    expect(Number.isNaN(before)).toBe(false)
+    // The drag must have armed a scroll watcher.
+    expect(scrollListeners.length).toBeGreaterThan(0)
+
+    // Page scrolls up by 20px (board top goes 0 → -20). Finger stays put; only a
+    // scroll fires — no pointermove.
+    rectState.top = -20
+    scrollListeners.forEach(cb => cb())
+    flush()
+
+    // The shard must move DOWN in board coords by exactly the scroll delta so it
+    // stays under the finger on screen. Old behaviour: translateY unchanged.
+    expect(translateY()).toBeCloseTo(before + 20, 4)
+
+    controller.onPointerUp(evt(50, 75.6))
+    // Watcher torn down when the drag ends.
+    expect(scrollListeners.length).toBe(0)
+
+    g.window = prevWindow
+  })
+
   it('re-locks when dragged out and brought back onto the target in one gesture', () => {
     const { controller, evt, flush } = makeDragController()
     reachSolvedOnTarget(controller)
@@ -277,5 +446,46 @@ describe('PuzzleController drag-to-unset (local, post-win)', () => {
     expect(s.phase).toBe('solved') // not stranded "in position but dead"
     expect(s.hot).toBe(true)
     expect(selectViewModel(s).formActive).toBe(true)
+  })
+})
+
+describe('PuzzleController tap-vs-drag classification', () => {
+  const ready = (c: PuzzleController) =>
+    c.store.dispatch({
+      type: 'ready',
+      index: 0,
+      seed: 1,
+      radius: 0.13,
+      tolerance: 0.06,
+    })
+
+  it('treats a long round-trip drag back to the origin as a drag, not a tap', () => {
+    // Regression: net displacement (down vs up) is ~0 for an out-and-back drag,
+    // so displacement-only logic toggles reveal as if it were a click. The
+    // path-aware `moved` flag must keep it a drag.
+    const { controller, evt, flush } = makeDragController()
+    ready(controller)
+    const before = controller.store.getState().revealed
+
+    controller.onPointerDown(evt(50, 75.6)) // grab at the resting centre
+    controller.onPointerMove(evt(10, 20)) // travel far from the origin
+    flush()
+    controller.onPointerMove(evt(50, 75.6)) // …then return to ~origin
+    flush()
+    controller.onPointerUp(evt(50, 75.6)) // release where we started
+
+    expect(controller.store.getState().revealed).toBe(before) // NOT toggled
+  })
+
+  it('still toggles reveal on a genuine in-place tap', () => {
+    const { controller, evt, flush } = makeDragController()
+    ready(controller)
+    const before = controller.store.getState().revealed
+
+    controller.onPointerDown(evt(50, 75.6))
+    flush() // no movement at all
+    controller.onPointerUp(evt(50, 75.6))
+
+    expect(controller.store.getState().revealed).toBe(!before) // toggled
   })
 })

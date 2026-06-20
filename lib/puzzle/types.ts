@@ -26,6 +26,7 @@ export interface PuzzleState {
   target: Point | null // known only once on-target (solve / on-target miss)
   token: string | null // signed solve token; gates the subscribe request
   error: string | null
+  errorRetry: boolean // the error is fixable by resetting the puzzle (offer a CTA)
   // Form / layout state — kept here so the view holds no local state and the
   // selector can derive everything it renders.
   email: string
@@ -54,7 +55,8 @@ export type PuzzleAction =
   | { type: 'unsolve' } // local un-placement; retains the cached win/token
   | { type: 'submitStart' }
   | { type: 'submitted' }
-  | { type: 'error'; message: string | null }
+  | { type: 'reset' } // tear the session back to a fresh challenge (new token)
+  | { type: 'error'; message: string | null; retry?: boolean }
   | { type: 'setEmail'; email: string }
   | { type: 'setTurnstileToken'; token: string | null }
   | { type: 'setBoardWidth'; width: number }
@@ -66,6 +68,7 @@ export interface PuzzleViewModel {
   connecting: boolean // socket not ready yet
   done: boolean // signed up — show the thank-you
   error: string | null
+  errorRetry: boolean // show a "give it another go" CTA that resets the puzzle
   // shard visuals
   shardWhite: boolean // white edge vs grey
   shadeHidden: boolean // drop the 20% shading

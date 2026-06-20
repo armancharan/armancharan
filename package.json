@@ -23,18 +23,27 @@
     "typescript": "^4.7.4"
   },
   "devDependencies": {
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/react": "^8.6.14",
+    "@storybook/react-vite": "^8.6.14",
     "@types/next": "^9.0.0",
     "@types/node": "^18.0.0",
     "@types/react": "^18.0.14",
+    "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.24",
     "sharp": "^0.35.2",
+    "storybook": "^8.6.14",
     "tailwindcss": "^3.3.2",
+    "vite": "^5.4.21",
     "vitest": "^2.1.9"
   },
   "scripts": {
     "develop": "yarn run next",
+    "dev:tunnel": "bash scripts/dev-tunnel.sh",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   }
 }

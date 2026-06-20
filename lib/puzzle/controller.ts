@@ -12,7 +12,15 @@ import {
   START,
   TAP_SLOP,
 } from './geometry'
-import { humanError, interpretServerMessage } from './presenter'
+import {
+  createConsoleLogger,
+  type LoggingService,
+} from './logging'
+import {
+  humanError,
+  interpretServerMessage,
+  isRetryableReason,
+} from './presenter'
 import {
   browserTurnstileService,
   defaultPuzzleConfig,
@@ -43,6 +51,7 @@ export interface PuzzleControllerDeps {
   subscribe?: SubscribeService
   turnstile?: TurnstileService
   analytics?: AnalyticsService
+  logger?: LoggingService
   project?: string // analytics tag
 }
 
@@ -56,13 +65,23 @@ export class PuzzleController {
   private readonly subscribe: SubscribeService
   private readonly turnstile: TurnstileService
   private readonly analytics: AnalyticsService
+  private readonly logger: LoggingService
   private readonly project: string
   private ws: WebSocket | null = null
+  private teardown: (() => void) | null = null // disposer for the live socket
   private dims = { w: 0, h: 0 }
   private pos: Point = START
   private pending: Point | null = null
+  // Latest raw pointer sample (viewport-relative). Kept so we can re-derive the
+  // board-relative position against a fresh rect when the page scrolls without
+  // emitting a pointermove (see onScroll).
+  private lastClient: { clientX: number; clientY: number } | null = null
   private offset: Point = { x: 0, y: 0 } // shard-centre minus grab point
   private down: Point = { x: 0, y: 0 }
+  // Grab point in viewport (client) px. Movement is measured against this in a
+  // scroll-stable space: client coords reflect the finger's real screen travel,
+  // so a page scroll mid-drag neither fakes movement nor masks it.
+  private downClient: { clientX: number; clientY: number } = { clientX: 0, clientY: 0 }
   private dragging = false
   private moved = false // synchronous mirror of dragMoved within a drag
   private raf: number | null = null
@@ -74,6 +93,7 @@ export class PuzzleController {
     this.subscribe = deps.subscribe ?? httpSubscribeService
     this.turnstile = deps.turnstile ?? browserTurnstileService
     this.analytics = deps.analytics ?? vercelAnalytics
+    this.logger = deps.logger ?? createConsoleLogger()
     this.project = deps.project ?? 'agentic-engineering-101'
     this.radius = 0.13
   }
@@ -92,11 +112,16 @@ export class PuzzleController {
 
   /** Open the socket. Returns a disposer for React effect cleanup. */
   connect = (): (() => void) => {
+    // Never run two sockets at once (retry/StrictMode-remount both re-enter here).
+    this.teardown?.()
+    this.teardown = null
+
     const url = this.config.wsUrl()
     if (!url) {
       this.store.dispatch({
         type: 'error',
-        message: 'puzzle is offline right now, try again later',
+        message: 'puzzle is offline right now',
+        retry: true,
       })
       return () => {}
     }
@@ -104,10 +129,12 @@ export class PuzzleController {
     let ws: WebSocket
     try {
       ws = new WebSocket(url)
-    } catch {
+    } catch (err) {
+      this.logger.logError('connect', err, { url })
       this.store.dispatch({
         type: 'error',
-        message: 'could not reach the puzzle, try again',
+        message: 'could not reach the puzzle',
+        retry: true,
       })
       return () => {}
     }
@@ -128,6 +155,7 @@ export class PuzzleController {
       }
       if (action.type === 'solved') {
         this.dragging = false
+        this.removeScrollWatch()
         this.cancelRaf()
         // The server reveals the exact target only now: snap into place instantly.
         this.applyPos(action.target.x, action.target.y, false)
@@ -147,22 +175,42 @@ export class PuzzleController {
       // target on a miss, as that would leak the answer and look "placed".
     }
 
-    const failIfConnecting = () => {
+    const failIfConnecting = (ev: Event) => {
       if (!closedByUs && this.store.getState().phase === 'connecting') {
+        this.logger.logError('connect', ev, { url, type: ev.type })
         this.store.dispatch({
           type: 'error',
-          message: 'could not reach the puzzle, try again',
+          message: 'could not reach the puzzle',
+          retry: true,
         })
       }
     }
     ws.onerror = failIfConnecting
     ws.onclose = failIfConnecting
 
-    return () => {
+    const dispose = () => {
       closedByUs = true
       this.cancelRaf()
       ws.close()
+      if (this.ws === ws) this.ws = null
     }
+    this.teardown = dispose
+    return dispose
+  }
+
+  /** Dispose the live socket (React effect cleanup). */
+  dispose = (): void => {
+    this.removeScrollWatch()
+    this.teardown?.()
+    this.teardown = null
+  }
+
+  /** Reset to a fresh challenge and reconnect — the "give it another go" action.
+   *  Used when the solve token expires (or a connection drops): a new socket
+   *  yields a new puzzle and, on solve, a new single-use token. */
+  retry = (): void => {
+    this.store.dispatch({ type: 'reset' })
+    this.connect()
   }
 
   /** Re-measure the board from the DOM; keeps the shard pinned through resizes. */
@@ -218,16 +266,18 @@ export class PuzzleController {
         solveToken: s.token,
       })
       if (!res.ok) {
-        this.store.dispatch({ type: 'error', message: humanError(res.reason) })
+        this.store.dispatch({
+          type: 'error',
+          message: humanError(res.reason),
+          retry: isRetryableReason(res.reason),
+        })
         return
       }
       this.analytics.track('subscribed', { project: this.project })
       this.store.dispatch({ type: 'submitted' })
-    } catch {
-      this.store.dispatch({
-        type: 'error',
-        message: 'something went wrong, try again',
-      })
+    } catch (err) {
+      this.logger.logError('submit', err, { project: this.project })
+      this.store.dispatch({ type: 'error', message: 'something went wrong' })
     }
   }
 
@@ -245,6 +295,8 @@ export class PuzzleController {
     } catch {
       // capture unsupported/failed — pointer events still fire on the element
     }
+    this.lastClient = { clientX: e.clientX, clientY: e.clientY }
+    this.downClient = { clientX: e.clientX, clientY: e.clientY }
     const p = this.toNorm(e)
     this.down = { x: p.x, y: p.y }
     // Grab immediately so click-and-hold feels instant.
@@ -253,6 +305,11 @@ export class PuzzleController {
     this.moved = false
     this.store.dispatch({ type: 'dragStart' })
     this.pending = p
+    // The page can scroll under an active drag (mobile rubber-band, a second
+    // finger, momentum). A scroll moves the board without firing a pointermove,
+    // so re-derive the board-relative position from the live pointer + a fresh
+    // rect to keep the grab point pinned under the finger.
+    this.addScrollWatch()
     const piece = this.deps.getPieceEl()
     if (piece) piece.style.opacity = '1'
     if (this.raf == null) this.raf = requestAnimationFrame(this.pump)
@@ -260,13 +317,20 @@ export class PuzzleController {
 
   onPointerMove = (e: PointerInput): void => {
     if (!this.dragging) return
+    this.lastClient = { clientX: e.clientX, clientY: e.clientY }
     const p = this.toNorm(e)
     this.pending = p
     // Only a real drag (travelled past the slop) hides the scramble; a
-    // stationary press stays a click.
+    // stationary press stays a click. Measured from the grab point in client
+    // (viewport) px, normalised by board width — scroll-stable, and latched once
+    // tripped so a round-trip drag back to the origin still counts as a drag.
     if (!this.moved) {
-      const moved = Math.hypot(p.x - this.down.x, p.y - this.down.y)
-      if (moved > TAP_SLOP) {
+      const w = this.dims.w || 1
+      const travelled = Math.hypot(
+        e.clientX - this.downClient.clientX,
+        e.clientY - this.downClient.clientY,
+      )
+      if (travelled / w > TAP_SLOP) {
         this.moved = true
         this.store.dispatch({ type: 'dragMoved' })
       }
@@ -289,6 +353,8 @@ export class PuzzleController {
   onPointerUp = (e: PointerInput): void => {
     if (!this.dragging) return
     this.dragging = false
+    this.removeScrollWatch()
+    this.lastClient = null
     this.store.dispatch({ type: 'dragEnd' })
     this.cancelRaf()
 
@@ -310,6 +376,10 @@ export class PuzzleController {
       centre,
       target: st.target,
       tolerance: st.tolerance,
+      // Path-aware: a long drag that returns to ~origin nets ~0 displacement but
+      // must NOT be read as a tap. `moved` latches true the moment travel passes
+      // the slop, so the round-trip is correctly classified as a drag.
+      moved: this.moved,
     })
 
     if (reveal) this.store.dispatch({ type: 'toggleReveal' })
@@ -389,11 +459,35 @@ export class PuzzleController {
   }
 
   private toNorm = (e: { clientX: number; clientY: number }): Point => {
+    // getBoundingClientRect is viewport-relative and tracks scroll, so pairing a
+    // FRESH rect with the viewport-relative clientX/clientY is scroll-safe.
     const rect = this.deps.getBoardEl()!.getBoundingClientRect()
     return {
       x: (e.clientX - rect.left) / rect.width,
       y: (e.clientY - rect.top) / rect.height,
     }
+  }
+
+  // The page scrolled mid-drag. No pointermove fires for a pure scroll, so the
+  // last sample's board-relative coords are now stale (the board moved under a
+  // stationary finger). Re-derive from the live pointer + a fresh rect and let
+  // the rAF pump reposition the shard, keeping the grab point under the finger.
+  private onScroll = (): void => {
+    if (!this.dragging || !this.lastClient) return
+    this.pending = this.toNorm(this.lastClient)
+    if (this.raf == null) this.raf = requestAnimationFrame(this.pump)
+  }
+
+  private addScrollWatch = (): void => {
+    if (typeof window === 'undefined') return
+    // Capture phase catches scrolls on any ancestor container, not just the
+    // window; passive since we never call preventDefault here.
+    window.addEventListener('scroll', this.onScroll, { capture: true, passive: true })
+  }
+
+  private removeScrollWatch = (): void => {
+    if (typeof window === 'undefined') return
+    window.removeEventListener('scroll', this.onScroll, { capture: true })
   }
 
   private send = (msg: Record<string, unknown>): void => {

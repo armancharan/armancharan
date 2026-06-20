@@ -13,18 +13,13 @@ export const DEFAULT_TOLERANCE = 0.06
 // Normalised travel under which a press counts as a click, not a drag.
 export const TAP_SLOP = 0.04
 
-// On compact (phone-sized) boards the shard becomes a small, fiddly touch
-// target, so we scale it up. Desktop boards (the 440px-capped modal yields a
-// ~392px board) stay below the breakpoint untouched; phones (board ≲ 350px)
-// get the larger shard. This only affects rendered size + centring — never the
-// secret target or the tolerance zone, so it can't change puzzle difficulty.
-export const COMPACT_BOARD_PX = 360
-export const COMPACT_PIECE_SCALE = 1.4
-
-// Effective (normalised) shard radius for a given board width. Pure so the view
-// (sizing) and the controller (positioning) derive the exact same value.
-export const effectivePieceRadius = (baseRadius: number, boardW: number): number =>
-  boardW > 0 && boardW < COMPACT_BOARD_PX ? baseRadius * COMPACT_PIECE_SCALE : baseRadius
+// Effective (normalised) shard radius for a given board width. The shard is
+// rendered at exactly the radius it was cropped at, so the crop is shown 1:1
+// (never magnified). To make the shard bigger, enlarge the captured region via
+// `radius` in worker/src/puzzle.config.json and regenerate the crops. Kept as a
+// helper so the view (sizing) and controller (positioning) derive one value.
+export const effectivePieceRadius = (baseRadius: number, _boardW: number): number =>
+  baseRadius
 
 export const dist = (a: Point, b: Point): number =>
   Math.hypot(a.x - b.x, a.y - b.y)
@@ -78,9 +73,24 @@ export const decidePointerUp = (args: {
   target: Point | null
   tolerance: number
   slop?: number
+  // True if the pointer EVER travelled past the slop at any point during the
+  // gesture. A round-trip drag (out and back to ~origin) nets ~0 displacement,
+  // so down-vs-up alone would misread it as a tap; this path-aware flag vetoes
+  // the reveal so only a gesture that never moved counts as a click.
+  moved?: boolean
 }): PointerUpDecision => {
-  const { won, solved, down, up, centre, target, tolerance, slop = TAP_SLOP } = args
-  const reveal = isTap(down, up, slop)
+  const {
+    won,
+    solved,
+    down,
+    up,
+    centre,
+    target,
+    tolerance,
+    slop = TAP_SLOP,
+    moved = false,
+  } = args
+  const reveal = !moved && isTap(down, up, slop)
 
   // Once won the target is cached, so placement is decided locally, purely from
   // where the shard actually rests — independent of whether it read as a tap.

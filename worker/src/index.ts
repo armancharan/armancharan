@@ -7,6 +7,7 @@
 // (samples, path, duration) so behavioural checks are server-truth, and on a
 // legitimate drop it mints an HMAC-signed token the Vercel API trusts.
 
+import { logError } from './logging'
 import config from './targets.json'
 
 export interface Env {
@@ -383,6 +384,7 @@ const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
       return jsonResponse({ ok: false, reason: 'puzzle_replay' }, 400, origin)
     }
   } catch (err) {
+    logError('subscribe.claim_token', err, { jti: tok.jti })
     return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
   }
 
@@ -396,6 +398,7 @@ const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
     const duplicate = (res.meta?.changes ?? 0) === 0
     return jsonResponse({ ok: true, duplicate }, 200, origin)
   } catch (err) {
+    logError('subscribe.insert_subscriber', err, { email })
     return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
   }
 }

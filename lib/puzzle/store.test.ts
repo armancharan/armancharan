@@ -23,6 +23,41 @@ const solved = (s: PuzzleState) =>
   })
 
 describe('puzzleReducer', () => {
+  it('reset drops the won session but keeps board + email', () => {
+    let s = ready()
+    s = solved(s)
+    s = puzzleReducer(s, { type: 'setBoardWidth', width: 320 })
+    s = puzzleReducer(s, { type: 'setEmail', email: 'me@x.co' })
+    s = puzzleReducer(s, {
+      type: 'error',
+      message: 'puzzle check expired',
+      retry: true,
+    })
+    expect(s.errorRetry).toBe(true)
+
+    const r = puzzleReducer(s, { type: 'reset' })
+    expect(r.phase).toBe('connecting')
+    expect(r.token).toBeNull()
+    expect(r.target).toBeNull()
+    expect(r.won).toBe(false)
+    expect(r.error).toBeNull()
+    expect(r.errorRetry).toBe(false)
+    expect(r.boardW).toBe(320) // preserved
+    expect(r.email).toBe('me@x.co') // preserved
+  })
+
+  it('error carries the retry flag; submitStart clears it', () => {
+    const e = puzzleReducer(initialPuzzleState, {
+      type: 'error',
+      message: 'nope',
+      retry: true,
+    })
+    expect(e.errorRetry).toBe(true)
+    const cleared = puzzleReducer(e, { type: 'submitStart' })
+    expect(cleared.errorRetry).toBe(false)
+    expect(cleared.error).toBeNull()
+  })
+
   it('ready moves to playing and stores challenge params', () => {
     const s = ready()
     expect(s.phase).toBe('playing')
@@ -79,7 +114,7 @@ describe('puzzleReducer', () => {
     const s = puzzleReducer(solved(playing), { type: 'unsolve' })
     expect(s.phase).toBe('playing')
     expect(s.hot).toBe(false)
-    expect(s.revealed).toBe(false)
+    expect(s.revealed).toBe(true) // reveal is tap-driven; dragging off never scrambles it
     // win stays cached so re-placement needs no server
     expect(s.won).toBe(true)
     expect(s.token).toBe('tok')

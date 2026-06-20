@@ -20,6 +20,7 @@ export const initialPuzzleState: PuzzleState = {
   target: null,
   token: null,
   error: null,
+  errorRetry: false,
   email: '',
   submitting: false,
   turnstileToken: null,
@@ -40,6 +41,7 @@ export const puzzleReducer = (
         pieceRadius: action.radius,
         tolerance: action.tolerance,
         error: null,
+        errorRetry: false,
       }
 
     case 'prox':
@@ -113,25 +115,37 @@ export const puzzleReducer = (
 
     case 'unsolve':
       // Pulled out of the zone: drop the win *look* and de-activate the form,
-      // but KEEP the cached token/target so it can be re-placed locally. Only
-      // meaningful once won.
+      // but KEEP the cached token/target so it can be re-placed locally. KEEP
+      // the shard's reveal state too — scramble/clear is driven only by tapping
+      // the shard, never as a side effect of dragging it off. Only meaningful
+      // once won.
       if (!state.won || state.phase !== 'solved') return state
       return {
         ...state,
         phase: 'playing',
         hot: false,
-        revealed: false,
       }
 
     case 'submitStart':
-      return { ...state, submitting: true, error: null }
+      return { ...state, submitting: true, error: null, errorRetry: false }
 
     case 'submitted':
       return { ...state, phase: 'done', submitting: false }
 
+    case 'reset':
+      // Throw the whole session back to a fresh challenge: drop the (possibly
+      // expired) token/target/win and reconnect for a new puzzle. Keep the
+      // measured board and the typed email so the user isn't made to redo those.
+      return { ...initialPuzzleState, boardW: state.boardW, email: state.email }
+
     case 'error':
       // Any error also ends an in-flight submit; nothing else mid-submit.
-      return { ...state, error: action.message, submitting: false }
+      return {
+        ...state,
+        error: action.message,
+        errorRetry: action.retry ?? false,
+        submitting: false,
+      }
 
     case 'setEmail':
       return state.email === action.email
