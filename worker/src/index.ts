@@ -7,10 +7,22 @@
 // (samples, path, duration) so behavioural checks are server-truth, and on a
 // legitimate drop it mints an HMAC-signed token the Vercel API trusts.
 
-import { decideHot, hotJitter, type HotGateFloors } from '../../lib/puzzle/hot'
+import { hotJitter, type HotGateFloors } from '../../lib/puzzle/hot'
+import {
+  accrueMoveSamples,
+  normaliseSamples,
+  sessionExpired,
+} from '../../lib/puzzle/session'
 import { isOriginAllowed, parseAllowList } from '../../lib/origin'
 import { logError } from './logging'
+import {
+  createMetrics,
+  emitSession,
+  type EndReason,
+  type MetricsService,
+} from './metrics'
 import config from './targets.json'
+import puzzleConfig from './puzzle.config.json'
 
 export interface Env {
   PUZZLE_ROOM: DurableObjectNamespace
@@ -23,11 +35,28 @@ export interface Env {
   // Limits/windows are configured in wrangler.toml ([ratelimits.simple]).
   PUZZLE_RATE_LIMITER?: RateLimit
   SUBSCRIBE_RATE_LIMITER?: RateLimit
+  // Workers Analytics Engine dataset for server-truth session/abuse metrics.
+  // Optional so local dev / tests without the binding fall back to a no-op.
+  PUZZLE_ANALYTICS?: AnalyticsEngineDataset
 }
+
+const PROJECT = 'agentic-engineering-101'
 
 const TARGETS = config.targets as Array<{ x: number; y: number }>
 const PIECE_RADIUS = config.radius
 const TOLERANCE = config.tolerance
+
+// Loud (non-fatal) sanity check at load: a count mismatch means targets.json is
+// stale or the EXAMPLE placeholder was copied over the real generated file. We
+// log via the existing structured logger (surfaced by `wrangler tail`) rather
+// than throw, so a misconfigured data file never takes the whole Worker down.
+if (TARGETS.length !== puzzleConfig.count) {
+  logError(
+    'puzzle.config_mismatch',
+    new Error('targets.json / puzzle.config.json count mismatch'),
+    { targets: TARGETS.length, expected: puzzleConfig.count },
+  )
+}
 
 // Behavioural floors — a human drag clears these trivially; a teleporting bot
 // post does not.
@@ -35,6 +64,17 @@ const MIN_SOLVE_MS = 600
 const MIN_SAMPLES = 10
 const MIN_PATH = 0.12
 const MAX_ATTEMPTS = 8
+
+// Server-side session wall-clock guard. The client stops transmitting at 90s;
+// we allow a few seconds of slack (clock skew / a final in-flight flush) before
+// closing. This is the REAL cap — the client one is a courtesy.
+const MAX_SESSION_MS = 95_000
+
+// Ceiling on cumulative behavioural samples per session. A genuine 90s drag at
+// ~60Hz produces ~5400 samples even before the client's delta-gate trims idle
+// jitter, so this sits ~1.6x above any real human session while bounding a bot
+// that blasts samples to inflate path/duration. Exceeding it closes the socket.
+const MAX_MOVE_SAMPLES = 9_000
 
 // Behavioural gate for the pre-win "hot" preview. Set to half the solve floors:
 // enough accrued samples, path, and time that an instantaneous binary-search
@@ -50,6 +90,14 @@ type Session = {
   index: number
   tx: number
   ty: number
+  // Connection accept time (ms epoch) — anchor for the session wall-clock cap.
+  startT: number
+  // Captured at connect for metrics (request.cf / headers aren't available in
+  // webSocketClose). `metricEmitted` latches the one-datapoint-per-session rule.
+  ip: string
+  country: string
+  colo: string
+  metricEmitted: boolean
   samples: number
   path: number
   firstT: number
@@ -93,10 +141,36 @@ const originAllowed = (req: Request, env: Env): boolean =>
 export class PuzzleRoom {
   private state: DurableObjectState
   private env: Env
+  private metrics: MetricsService
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
     this.env = env
+    this.metrics = createMetrics(env.PUZZLE_ANALYTICS)
+  }
+
+  // Emit exactly one session datapoint per session (latched by metricEmitted),
+  // then persist the latch so a later terminal path can't double-count.
+  private endSession(ws: WebSocket, s: Session, endReason: EndReason): void {
+    if (s.metricEmitted) return
+    const dur = Date.now() - s.startT
+    const hotGatePass =
+      s.samples >= HOT_GATE.minSamples &&
+      s.path >= HOT_GATE.minPath &&
+      s.lastT - s.firstT >= HOT_GATE.minMs
+    emitSession(this.metrics, s, {
+      ip: s.ip,
+      endReason,
+      country: s.country,
+      colo: s.colo,
+      project: PROJECT,
+      durationMs: dur,
+      sampleCount: s.samples,
+      attempts: s.attempts,
+      pathLen: s.path,
+      hotGatePass,
+    })
+    ws.serializeAttachment(s)
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -116,10 +190,18 @@ export class PuzzleRoom {
     // leaves the server), but seeding it from a CSPRNG means every challenge
     // gets a unique, unpredictable polygon — no fixed outline to fingerprint.
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]
+    // request.cf carries the colo/country and is only available here (not in
+    // webSocketClose), so snapshot it onto the session at connect.
+    const cf = req.cf as { country?: string; colo?: string } | undefined
     const session: Session = {
       index,
       tx: TARGETS[index].x,
       ty: TARGETS[index].y,
+      startT: Date.now(),
+      ip: req.headers.get('CF-Connecting-IP') || 'unknown',
+      country: cf?.country || 'unknown',
+      colo: cf?.colo || 'unknown',
+      metricEmitted: false,
       samples: 0,
       path: 0,
       firstT: 0,
@@ -149,10 +231,18 @@ export class PuzzleRoom {
     const s = ws.deserializeAttachment() as Session | null
     if (!s) return
 
-    let msg: { type?: string; x?: number; y?: number }
+    let msg: { type?: string; x?: number; y?: number; samples?: unknown }
     try {
       msg = JSON.parse(raw)
     } catch {
+      return
+    }
+
+    // Server-side session wall-clock guard. The real cap (the client stops at
+    // 90s); any message past the slack window closes the socket.
+    if (sessionExpired(Date.now(), s.startT, MAX_SESSION_MS)) {
+      this.endSession(ws, s, 'session_expired')
+      ws.close(1008, 'session_expired')
       return
     }
 
@@ -168,29 +258,36 @@ export class PuzzleRoom {
     // authoritative on-target + behavioural check still happens only on release,
     // and Turnstile + single-use D1 solve tokens + rate limiting + the attempt cap
     // remain the real wall against abuse.
-    if (msg.type === 'move' && typeof msg.x === 'number' && typeof msg.y === 'number') {
-      const now = Date.now()
-      if (!s.firstT) s.firstT = now
-      if (s.samples > 0) s.path += Math.hypot(msg.x - s.lastX, msg.y - s.lastY)
-      s.samples += 1
-      s.lastT = now
-      s.lastX = msg.x
-      s.lastY = msg.y
+    if (msg.type === 'move') {
+      // Accept the batched `samples: [...]` shape (and a single {x,y} for
+      // backward-compat). Each sample is accrued exactly as one-per-message was:
+      // +1 sample each, path between consecutive samples — so the human-motion
+      // gate keeps counting per sample, not per batch. Hotness is decided once
+      // off the last sample (at most one `hot` per message).
+      const batch = normaliseSamples(msg)
+      if (batch.length === 0) return
+      const res = accrueMoveSamples({
+        acc: s,
+        samples: batch,
+        now: Date.now(),
+        tx: s.tx,
+        ty: s.ty,
+        tolerance: TOLERANCE,
+        jitter: s.hotJitter,
+        hotGate: HOT_GATE,
+        solved: s.solved,
+        maxSamples: MAX_MOVE_SAMPLES,
+      })
       ws.serializeAttachment(s)
-      // Don't drive hotness once already solved — post-win the client knows the
-      // target and computes the preview locally.
-      if (!s.solved) {
-        const hot = decideHot({
-          dist: Math.hypot(msg.x - s.tx, msg.y - s.ty),
-          tolerance: TOLERANCE,
-          jitter: s.hotJitter,
-          samples: s.samples,
-          path: s.path,
-          elapsedMs: now - s.firstT,
-          floors: HOT_GATE,
-        })
-        ws.send(JSON.stringify({ type: 'hot', hot }))
+      // Bound runaway/abusive sample volume well above any real human session.
+      if (res.capExceeded) {
+        this.endSession(ws, s, 'too_many_samples')
+        ws.close(1008, 'too_many_samples')
+        return
       }
+      // Don't drive hotness once solved — post-win the client knows the target
+      // and computes the preview locally (res.hot is null then).
+      if (res.hot !== null) ws.send(JSON.stringify({ type: 'hot', hot: res.hot }))
       return
     }
 
@@ -226,6 +323,9 @@ export class PuzzleRoom {
         ws.send(
           JSON.stringify({ type: 'solved', token, target: { x: s.tx, y: s.ty } }),
         )
+        // Terminal success — the client detaches the socket after this, so emit
+        // the session datapoint now (a later disconnect won't double-count).
+        this.endSession(ws, s, 'solved')
         return
       }
 
@@ -238,12 +338,21 @@ export class PuzzleRoom {
       ws.send(
         JSON.stringify({ type: 'miss', reason: onTarget ? 'behavior' : 'far' }),
       )
-      if (s.attempts >= MAX_ATTEMPTS) ws.close(1008, 'too_many_attempts')
+      if (s.attempts >= MAX_ATTEMPTS) {
+        this.endSession(ws, s, 'too_many_attempts')
+        ws.close(1008, 'too_many_attempts')
+      }
       return
     }
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    // Emit a session datapoint for connections that ended without hitting an
+    // explicit terminal path (the player just closed the tab). Guarded by the
+    // metricEmitted latch, so a solved/expired/capped session that already
+    // emitted is never double-counted here.
+    const s = ws.deserializeAttachment() as Session | null
+    if (s) this.endSession(ws, s, 'disconnect')
     try {
       ws.close()
     } catch {
@@ -474,7 +583,10 @@ export default {
       return new Response('not found', { status: 404 })
     }
 
+    const metrics = createMetrics(env.PUZZLE_ANALYTICS)
+
     if (!originAllowed(req, env)) {
+      metrics.recordReject({ ip: clientIp(req), reason: 'origin_rejected' })
       return new Response('forbidden origin', { status: 403 })
     }
 
@@ -483,6 +595,7 @@ export default {
     // is trivially reset and room creation is unbounded per IP. The durable
     // counter survives reconnects and isolate hops.
     if (await isRateLimited(env.PUZZLE_RATE_LIMITER, clientIp(req))) {
+      metrics.recordReject({ ip: clientIp(req), reason: 'rate_limited' })
       return new Response('rate limited', {
         status: 429,
         headers: { 'Retry-After': '60' },

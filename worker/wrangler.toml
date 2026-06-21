@@ -29,6 +29,14 @@ migrations_dir = "../db/migrations"
 [observability]
 enabled = true
 
+# Workers Analytics Engine: server-truth session + abuse metrics. One datapoint
+# per finished session (end_reason, country, colo, duration, samples, attempts,
+# path, hot-gate pass) plus reject datapoints for rate-limit/origin blocks.
+# Query via the Analytics Engine SQL API against the `puzzle_sessions` dataset.
+[[analytics_engine_datasets]]
+binding = "PUZZLE_ANALYTICS"
+dataset = "puzzle_sessions"
+
 # Native Cloudflare Workers Rate Limiting bindings: durable, cross-isolate,
 # per-colo counters keyed by client IP. Tune the limit/period here — `period`
 # must be 10 or 60 (seconds). Separate namespaces keep the two endpoints' budgets
