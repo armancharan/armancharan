@@ -111,13 +111,23 @@ export const PuzzleView = ({
               <LoadingLine />
             )}
             {vm.errorRetry ? (
-              <button
-                type="button"
-                onClick={actions.retry}
-                className="cursor-pointer text-[13px] text-primary underline decoration-from-font transition-opacity hover:opacity-70"
-              >
-                try again
-              </button>
+              vm.canRetry ? (
+                <button
+                  type="button"
+                  onClick={actions.retry}
+                  className="cursor-pointer text-[13px] text-primary underline decoration-from-font transition-opacity hover:opacity-70"
+                >
+                  try again ({vm.retriesLeft})
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="cursor-default text-[13px] text-primary disabled:text-primary disabled:opacity-100"
+                >
+                  still no luck {'\u2014'} refresh to retry
+                </button>
+              )
             ) : null}
           </div>
         ) : null}
@@ -227,16 +237,29 @@ export const PuzzleView = ({
               <p className="mt-2 text-[13px] text-secondary">
                 {vm.error}
                 {vm.errorRetry ? (
-                  <>
-                    {' \u2014 '}
-                    <button
-                      type="button"
-                      onClick={actions.retry}
-                      className="cursor-pointer text-primary underline decoration-from-font transition-opacity hover:opacity-70"
-                    >
-                      try again
-                    </button>
-                  </>
+                  vm.canRetry ? (
+                    <>
+                      {' \u2014 '}
+                      <button
+                        type="button"
+                        onClick={actions.retry}
+                        className="cursor-pointer text-primary underline decoration-from-font transition-opacity hover:opacity-70"
+                      >
+                        try again ({vm.retriesLeft})
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {' \u2014 '}
+                      <button
+                        type="button"
+                        disabled
+                        className="cursor-default text-primary disabled:text-primary disabled:opacity-100"
+                      >
+                        still no luck {'\u2014'} refresh to retry
+                      </button>
+                    </>
+                  )
                 ) : null}
               </p>
             ) : null}

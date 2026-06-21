@@ -5,6 +5,12 @@
 import { DEFAULT_PIECE_RADIUS, DEFAULT_TOLERANCE } from './geometry'
 import type { PuzzleAction, PuzzleState } from './types'
 
+// How many consecutive "try again" reconnects the user gets before the CTA is
+// disabled (and they're asked to refresh). The budget resets to this on every
+// successful (re)connect — i.e. each time the session reaches `ready` — so only
+// consecutive failures burn it down.
+export const MAX_RETRIES = 3
+
 export const initialPuzzleState: PuzzleState = {
   phase: 'connecting',
   hot: false,
@@ -21,6 +27,7 @@ export const initialPuzzleState: PuzzleState = {
   token: null,
   error: null,
   errorRetry: false,
+  retriesLeft: MAX_RETRIES,
   email: '',
   submitting: false,
   turnstileToken: null,
@@ -42,6 +49,9 @@ export const puzzleReducer = (
         tolerance: action.tolerance,
         error: null,
         errorRetry: false,
+        // A successful (re)connect refills the retry budget, so only consecutive
+        // failures (which never reach `ready`) count against it.
+        retriesLeft: MAX_RETRIES,
       }
 
     case 'prox':
@@ -136,7 +146,14 @@ export const puzzleReducer = (
       // Throw the whole session back to a fresh challenge: drop the (possibly
       // expired) token/target/win and reconnect for a new puzzle. Keep the
       // measured board and the typed email so the user isn't made to redo those.
-      return { ...initialPuzzleState, boardW: state.boardW, email: state.email }
+      // `reset` is dispatched once per consumed "try again", so this is where the
+      // retry budget is decremented (clamped at 0). It refills again on `ready`.
+      return {
+        ...initialPuzzleState,
+        boardW: state.boardW,
+        email: state.email,
+        retriesLeft: Math.max(0, state.retriesLeft - 1),
+      }
 
     case 'error':
       // Any error also ends an in-flight submit; nothing else mid-submit.

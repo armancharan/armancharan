@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createPuzzleStore,
   initialPuzzleState,
+  MAX_RETRIES,
   puzzleReducer,
 } from './store'
 import type { PuzzleState } from './types'
@@ -208,6 +209,29 @@ describe('puzzleReducer', () => {
     const s = puzzleReducer(initialPuzzleState, { type: 'setBoardWidth', width: 400 })
     expect(s.boardW).toBe(400)
     expect(puzzleReducer(s, { type: 'setBoardWidth', width: 400 })).toBe(s)
+  })
+
+  it('starts with a full retry budget', () => {
+    expect(initialPuzzleState.retriesLeft).toBe(MAX_RETRIES)
+  })
+
+  it('reset decrements the retry budget, clamped at 0', () => {
+    let s = initialPuzzleState
+    s = puzzleReducer(s, { type: 'reset' })
+    expect(s.retriesLeft).toBe(MAX_RETRIES - 1)
+    s = puzzleReducer(s, { type: 'reset' })
+    s = puzzleReducer(s, { type: 'reset' })
+    expect(s.retriesLeft).toBe(0) // 3 → 2 → 1 → 0
+    s = puzzleReducer(s, { type: 'reset' })
+    expect(s.retriesLeft).toBe(0) // never goes negative
+  })
+
+  it('ready refills the retry budget (only consecutive failures burn it)', () => {
+    let s = puzzleReducer(initialPuzzleState, { type: 'reset' })
+    s = puzzleReducer(s, { type: 'reset' })
+    expect(s.retriesLeft).toBe(MAX_RETRIES - 2)
+    s = ready(s)
+    expect(s.retriesLeft).toBe(MAX_RETRIES)
   })
 })
 

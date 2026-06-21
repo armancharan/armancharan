@@ -64,6 +64,8 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
     done: s.phase === 'done',
     error: s.error,
     errorRetry: s.errorRetry,
+    retriesLeft: s.retriesLeft,
+    canRetry: s.retriesLeft > 0,
     shardWhite: hotOrSolved,
     shadeHidden: hotOrSolved,
     // The scramble is lifted by the explicit reveal toggle (a click) OR while the

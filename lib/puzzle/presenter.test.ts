@@ -7,7 +7,7 @@ import {
   resolvePointerMove,
   selectViewModel,
 } from './presenter'
-import { initialPuzzleState, puzzleReducer } from './store'
+import { initialPuzzleState, MAX_RETRIES, puzzleReducer } from './store'
 import type { PuzzleState } from './types'
 
 const playing = puzzleReducer(initialPuzzleState, {
@@ -140,6 +140,16 @@ describe('selectViewModel', () => {
   it('instruction copy follows phase', () => {
     expect(selectViewModel(playing).instruction).toContain('dislocated')
     expect(selectViewModel(solved).instruction).toContain('drop your email')
+  })
+
+  it('exposes the retry countdown and disables the CTA at 0', () => {
+    expect(selectViewModel(initialPuzzleState).retriesLeft).toBe(MAX_RETRIES)
+    expect(selectViewModel(initialPuzzleState).canRetry).toBe(true)
+
+    let s = initialPuzzleState
+    for (let i = 0; i < MAX_RETRIES; i++) s = puzzleReducer(s, { type: 'reset' })
+    expect(selectViewModel(s).retriesLeft).toBe(0)
+    expect(selectViewModel(s).canRetry).toBe(false)
   })
 })
 
