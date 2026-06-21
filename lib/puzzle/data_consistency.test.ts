@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,9 +29,31 @@ interface Targets {
   tolerance: number
   targets: { x: number; y: number }[]
 }
+interface Manifest {
+  targetsHash: string
+  count: number
+  radius: number
+}
 
 const config = readJson('worker/src/puzzle.config.json') as Config
 const targets = readJson('worker/src/targets.json') as Targets
+const manifest = readJson('public/pieces/manifest.json') as Manifest
+
+// Canonical content hash of the answer set. MUST stay byte-identical to the
+// implementation in scripts/generate-pieces.mjs (which writes it into the
+// manifest). If the two ever drift, this recomputation won't match the manifest
+// and CI fails — which is the whole point.
+const targetsHash = (t: Targets): string =>
+  createHash('sha256')
+    .update(
+      JSON.stringify({
+        radius: t.radius,
+        tolerance: t.tolerance,
+        targets: t.targets.map(p => ({ x: p.x, y: p.y })),
+      }),
+    )
+    .digest('hex')
+    .slice(0, 16)
 
 describe('puzzle data pipeline consistency', () => {
   it('targets.json is the real generated file, not the example placeholder', () => {
@@ -68,6 +91,22 @@ describe('puzzle data pipeline consistency', () => {
       .map(m => Number(m[1]))
       .sort((a, b) => a - b)
     expect(indices).toEqual(Array.from({ length: config.count }, (_, i) => i))
+  })
+
+  it('pieces manifest hash matches the committed targets.json', () => {
+    // A mismatch means the crops in public/pieces were rendered from a different
+    // answer set than the worker ships — i.e. pieces/targets drifted. Unshippable.
+    expect(
+      manifest.targetsHash,
+      'public/pieces/manifest.json hash != worker/src/targets.json — pieces and answers drifted; run `node scripts/generate-pieces.mjs`',
+    ).toBe(targetsHash(targets))
+  })
+
+  it('manifest count and radius agree with targets and config', () => {
+    expect(manifest.count).toBe(config.count)
+    expect(manifest.count).toBe(targets.targets.length)
+    expect(manifest.radius).toBe(config.radius)
+    expect(manifest.radius).toBe(targets.radius)
   })
 
   // Proves the placeholder trap actually catches the example, without clobbering
