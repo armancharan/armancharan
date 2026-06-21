@@ -4,7 +4,7 @@
   "private": true,
   "description": "Cloudflare Worker + Durable Object backing the cloud-placement puzzle",
   "engines": {
-    "node": "22.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "wrangler dev --port 8799",
