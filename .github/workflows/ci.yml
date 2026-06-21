@@ -35,4 +35,7 @@ jobs:
           cache: npm
           cache-dependency-path: worker/package-lock.json
       - run: npm ci
+      # targets.json holds the secret answer coords (gitignored); use the
+      # checked-in example so tsc can resolve the import in CI.
+      - run: cp src/targets.example.json src/targets.json
       - run: npm run typecheck
