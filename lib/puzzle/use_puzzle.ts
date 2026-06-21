@@ -123,9 +123,20 @@ export const usePuzzle = (opts: UsePuzzleOptions): UsePuzzleResult => {
     return () => controller.dispose()
   }, [controller])
 
-  // Measure the board and keep the shard pinned through resizes.
+  // Measure the board and keep the shard pinned through *any* width change.
+  // Observing the element (not the window) is what makes narrow screens work
+  // automatically: the board can change width with no window `resize` event —
+  // e.g. opening the modal toggles the page scrollbar (body overflow:hidden),
+  // and other reflows can nudge it too. A ResizeObserver catches them all; the
+  // window listener is a fallback for environments without it.
   useEffect(() => {
+    const el = board.current
     controller.measure()
+    if (el && typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => controller.measure())
+      ro.observe(el)
+      return () => ro.disconnect()
+    }
     window.addEventListener('resize', controller.measure)
     return () => window.removeEventListener('resize', controller.measure)
   }, [controller])
