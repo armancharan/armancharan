@@ -553,6 +553,310 @@ describe('PuzzleController server-driven hot (pre-win)', () => {
   })
 })
 
+// Batched transmit + delta-gate + session cap. Wires a fake socket so we can
+// inspect what's actually sent, manual rAF (to drive the pump), and fake timers
+// (to drive the 75ms flush interval and the 120s session cap). A 100px board
+// means clientX/100 maps straight to normalised coords; the delta threshold is
+// 0.5/100 = 0.005 norm (0.5px).
+describe('PuzzleController batched transmit + caps', () => {
+  class FakeSocket {
+    static OPEN = 1
+    readyState = 1
+    onmessage: ((ev: { data: string }) => void) | null = null
+    onerror: ((ev: unknown) => void) | null = null
+    onclose: ((ev: unknown) => void) | null = null
+    closed = false
+    constructor(public url: string) {}
+    send(_d: string): void {}
+    close(): void {
+      this.closed = true
+      this.readyState = 3
+    }
+  }
+
+  const setup = () => {
+    vi.useFakeTimers()
+    const g = globalThis as unknown as {
+      WebSocket?: unknown
+      requestAnimationFrame: (cb: (t: number) => void) => number
+      cancelAnimationFrame: (id: number) => void
+    }
+    const prevWS = g.WebSocket
+    const prevRaf = g.requestAnimationFrame
+    const prevCancel = g.cancelAnimationFrame
+
+    const sent: string[] = []
+    let socket!: FakeSocket
+    g.WebSocket = class extends FakeSocket {
+      constructor(url: string) {
+        super(url)
+        socket = this
+      }
+      send(d: string): void {
+        sent.push(d)
+      }
+    }
+    // Manual rAF (override AFTER fake timers so our stub wins).
+    let rafCb: ((t: number) => void) | undefined
+    g.requestAnimationFrame = cb => {
+      rafCb = cb
+      return 1
+    }
+    g.cancelAnimationFrame = () => {
+      rafCb = undefined
+    }
+    const flushRaf = () => {
+      const cb = rafCb
+      rafCb = undefined
+      cb?.(0)
+    }
+
+    const piece = { style: {} as Record<string, string> }
+    const board = {
+      clientWidth: 100,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+    }
+    const controller = new PuzzleController({
+      aspect: 1,
+      getBoardEl: () => board as unknown as HTMLElement,
+      getPieceEl: () => piece as unknown as HTMLElement,
+      config: { wsUrl: () => 'wss://example.test/puzzle', siteKey: undefined },
+      analytics: { track: () => {} },
+      logger: { logError: vi.fn() },
+    })
+    controller.setBoardWidth(100)
+    controller.connect()
+    controller.store.dispatch({
+      type: 'ready',
+      index: 0,
+      seed: 1,
+      radius: 0.13,
+      tolerance: 0.06,
+    })
+
+    const evt = (x: number, y: number) =>
+      ({
+        clientX: x,
+        clientY: y,
+        pointerId: 1,
+        currentTarget: { setPointerCapture: () => {} } as unknown as Element,
+      }) as const
+
+    const moves = () =>
+      sent
+        .map(s => JSON.parse(s) as { type: string; samples?: unknown[] })
+        .filter(m => m.type === 'move')
+
+    const restore = () => {
+      g.WebSocket = prevWS
+      g.requestAnimationFrame = prevRaf
+      g.cancelAnimationFrame = prevCancel
+      vi.useRealTimers()
+    }
+    return { controller, socket, sent, moves, flushRaf, evt, restore }
+  }
+
+  it('buffers per-frame samples and flushes them as ONE batched move', () => {
+    const { controller, moves, flushRaf, evt, restore } = setup()
+    try {
+      controller.onPointerDown(evt(50, 50))
+      flushRaf() // buffer the grab sample
+      controller.onPointerMove(evt(60, 50))
+      flushRaf()
+      controller.onPointerMove(evt(70, 50))
+      flushRaf()
+      controller.onPointerMove(evt(80, 50))
+      flushRaf()
+
+      // Nothing sent until the batch window elapses.
+      expect(moves()).toHaveLength(0)
+
+      vi.advanceTimersByTime(80) // > BATCH_INTERVAL_MS (75)
+
+      const m = moves()
+      expect(m).toHaveLength(1) // ONE frame, not one-per-sample
+      expect(Array.isArray(m[0].samples)).toBe(true)
+      expect(m[0].samples!.length).toBe(4) // all four frames coalesced
+    } finally {
+      restore()
+    }
+  })
+
+  it('delta-gates sub-threshold jitter out of the buffer', () => {
+    const { controller, moves, flushRaf, evt, restore } = setup()
+    try {
+      controller.onPointerDown(evt(50, 50))
+      flushRaf() // grab sample buffered
+      // Each move is < 0.5px from the grab sample → all dropped.
+      controller.onPointerMove(evt(50.1, 50))
+      flushRaf()
+      controller.onPointerMove(evt(50.2, 50))
+      flushRaf()
+      controller.onPointerMove(evt(50.3, 50))
+      flushRaf()
+
+      vi.advanceTimersByTime(80)
+      const m = moves()
+      expect(m).toHaveLength(1)
+      expect(m[0].samples!.length).toBe(1) // only the grab sample survived
+    } finally {
+      restore()
+    }
+  })
+
+  it('flushes immediately on release (no waiting for the batch window)', () => {
+    const { controller, moves, flushRaf, evt, restore } = setup()
+    try {
+      controller.onPointerDown(evt(50, 50))
+      flushRaf()
+      controller.onPointerMove(evt(70, 50))
+      flushRaf()
+
+      // Release BEFORE advancing the batch timer — the final position must be
+      // flushed right away, not held for up to 75ms.
+      controller.onPointerUp(evt(70, 50))
+      expect(moves().length).toBeGreaterThanOrEqual(1)
+
+      const before = moves().length
+      vi.advanceTimersByTime(200) // interval stopped → no further move frames
+      expect(moves().length).toBe(before)
+    } finally {
+      restore()
+    }
+  })
+
+  it('stops the session and surfaces the retry path after the time cap', () => {
+    const { controller, socket, restore } = setup()
+    try {
+      vi.advanceTimersByTime(90_000) // SESSION_CAP_MS
+
+      const s = controller.store.getState()
+      expect(s.error).toContain('timed out')
+      expect(s.errorRetry).toBe(true)
+      expect(socket.closed).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('does NOT trip the time cap once the puzzle is won (local play)', () => {
+    const { controller, restore } = setup()
+    try {
+      controller.store.dispatch({
+        type: 'solved',
+        token: 'tok',
+        target: { x: 0.4, y: 0.5 },
+      })
+      vi.advanceTimersByTime(90_000)
+      expect(controller.store.getState().error).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+})
+
+// The retry budget: each "try again" consumes one reconnect; once spent, retry()
+// must NOT open a new socket. A successful reconnect (reaching `ready`) refills
+// it. We count WebSocket constructions to prove whether a reconnect happened.
+describe('PuzzleController retry budget', () => {
+  class FakeSocket {
+    static OPEN = 1
+    readyState = 1
+    onmessage: ((ev: { data: string }) => void) | null = null
+    onerror: ((ev: unknown) => void) | null = null
+    onclose: ((ev: unknown) => void) | null = null
+    sent: string[] = []
+    closed = false
+    constructor(public url: string) {}
+    send(d: string): void {
+      this.sent.push(d)
+    }
+    close(): void {
+      this.closed = true
+      this.readyState = 3
+    }
+  }
+
+  const connect = () => {
+    const g = globalThis as unknown as { WebSocket?: unknown }
+    const prev = g.WebSocket
+    let count = 0
+    g.WebSocket = class extends FakeSocket {
+      constructor(url: string) {
+        super(url)
+        count++
+      }
+    }
+    const controller = new PuzzleController({
+      aspect: 1,
+      getBoardEl: () => null,
+      getPieceEl: () => null,
+      analytics: { track: () => {} },
+      logger: { logError: vi.fn() },
+      config: { wsUrl: () => 'wss://example.test/puzzle', siteKey: undefined },
+    })
+    controller.connect()
+    return { controller, restore: () => (g.WebSocket = prev), getCount: () => count }
+  }
+
+  it('counts down 3→2→1→0 and reconnects each time until spent', () => {
+    const { controller, restore, getCount } = connect()
+    try {
+      expect(controller.store.getState().retriesLeft).toBe(3)
+      const initial = getCount() // the on-mount connect
+
+      controller.retry()
+      expect(controller.store.getState().retriesLeft).toBe(2)
+      controller.retry()
+      expect(controller.store.getState().retriesLeft).toBe(1)
+      controller.retry()
+      expect(controller.store.getState().retriesLeft).toBe(0)
+
+      // Three retries → three fresh sockets opened.
+      expect(getCount()).toBe(initial + 3)
+    } finally {
+      restore()
+    }
+  })
+
+  it('no-ops (no reconnect) once the budget is exhausted', () => {
+    const { controller, restore, getCount } = connect()
+    try {
+      controller.store.dispatch({ type: 'reset' })
+      controller.store.dispatch({ type: 'reset' })
+      controller.store.dispatch({ type: 'reset' })
+      expect(controller.store.getState().retriesLeft).toBe(0)
+
+      const before = getCount()
+      controller.retry() // exhausted → must not open a socket
+      expect(getCount()).toBe(before)
+      expect(controller.store.getState().retriesLeft).toBe(0)
+    } finally {
+      restore()
+    }
+  })
+
+  it('refills the budget on a successful reconnect (ready)', () => {
+    const { controller, restore } = connect()
+    try {
+      controller.retry()
+      controller.retry()
+      expect(controller.store.getState().retriesLeft).toBe(1)
+
+      controller.store.dispatch({
+        type: 'ready',
+        index: 0,
+        seed: 1,
+        radius: 0.13,
+        tolerance: 0.06,
+      })
+      expect(controller.store.getState().retriesLeft).toBe(3)
+    } finally {
+      restore()
+    }
+  })
+})
+
 describe('PuzzleController tap-vs-drag classification', () => {
   const ready = (c: PuzzleController) =>
     c.store.dispatch({

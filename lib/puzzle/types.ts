@@ -27,6 +27,7 @@ export interface PuzzleState {
   token: string | null // signed solve token; gates the subscribe request
   error: string | null
   errorRetry: boolean // the error is fixable by resetting the puzzle (offer a CTA)
+  retriesLeft: number // remaining "try again" reconnects before the budget is spent
   // Form / layout state — kept here so the view holds no local state and the
   // selector can derive everything it renders.
   email: string
@@ -69,6 +70,8 @@ export interface PuzzleViewModel {
   done: boolean // signed up — show the thank-you
   error: string | null
   errorRetry: boolean // show a "try again" CTA that resets the puzzle
+  retriesLeft: number // remaining retries (drives the "try again (N)" countdown)
+  canRetry: boolean // budget not yet spent — the CTA is still clickable
   // shard visuals
   shardWhite: boolean // white edge vs grey
   shadeHidden: boolean // drop the 20% shading
@@ -92,6 +95,16 @@ export interface PuzzleViewModel {
   instruction: string
   submitLabel: string
 }
+
+// Client -> server wire messages.
+//
+// Pointer movement is sent as a BATCH of samples coalesced over a short window
+// (see PuzzleController) rather than one frame per socket frame, cutting send
+// volume ~5x while preserving the ~60Hz behavioural stream the server measures.
+export type ClientMessage =
+  | { type: 'move'; samples: Point[] }
+  | { type: 'release'; x: number; y: number }
+  | { type: 'reset' }
 
 // Server -> client wire messages.
 export type ServerMessage =

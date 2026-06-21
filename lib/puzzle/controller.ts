@@ -32,7 +32,7 @@ import {
   type TurnstileService,
 } from './services'
 import { createPuzzleStore, type PuzzleStore } from './store'
-import type { Point } from './types'
+import type { ClientMessage, Point } from './types'
 
 // Structural subset of a (React or DOM) pointer event — keeps this file free of
 // any framework dependency.
@@ -56,6 +56,23 @@ export interface PuzzleControllerDeps {
 }
 
 const SNAP_TRANSITION = 'transform .4s cubic-bezier(.34,1.4,.6,1), opacity .25s ease'
+
+// Coalesce buffered pointer samples into ONE socket frame every BATCH_INTERVAL_MS
+// instead of sending one frame per animation frame (~60/s). We keep SAMPLING at
+// frame rate (buffering every pump) so the server still receives ~60Hz of
+// behavioural samples — we just transmit them batched, cutting socket sends ~5x.
+const BATCH_INTERVAL_MS = 75
+
+// Drop a buffered sample that moved less than this many px (normalised by board
+// width at use) from the last buffered one — sheds idle/aiming jitter that would
+// otherwise inflate the sample/path stream. The release sample is never dropped.
+const MIN_SAMPLE_DELTA_PX = 0.5
+
+// Generous wall-clock cap on a single (pre-win) session, anchored at connect.
+// Past this we stop transmitting and stop the drag-solve loop, surfacing the
+// retryable error path; the server enforces its own (slightly longer) cap as the
+// real guard. A human placement clears it many times over.
+const SESSION_CAP_MS = 90_000
 
 export class PuzzleController {
   readonly store: PuzzleStore = createPuzzleStore()
@@ -86,6 +103,13 @@ export class PuzzleController {
   private moved = false // synchronous mirror of dragMoved within a drag
   private raf: number | null = null
   private radius: number
+  // Pointer samples buffered since the last flush, plus the last buffered point
+  // (for the delta-gate) and the interval/timer handles for the batched
+  // transmit and the session wall-clock cap.
+  private sampleBuffer: Point[] = []
+  private lastBuffered: Point | null = null
+  private flushTimer: ReturnType<typeof setInterval> | null = null
+  private sessionTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(deps: PuzzleControllerDeps) {
     this.deps = deps
@@ -139,6 +163,9 @@ export class PuzzleController {
       return () => {}
     }
     this.ws = ws
+    // Anchor the session wall-clock cap at connection. Pre-win only — once won
+    // the socket is detached and play is fully local, so the cap is moot.
+    this.armSessionCap()
     // StrictMode mounts effects twice in dev; the first socket is closed by
     // cleanup before it connects, so ignore closes we initiate ourselves.
     let closedByUs = false
@@ -162,6 +189,10 @@ export class PuzzleController {
         this.dragging = false
         this.removeScrollWatch()
         this.cancelRaf()
+        // Win reached: the socket is about to be detached and all further play is
+        // local, so the transmit batch and the session cap are no longer needed.
+        this.stopFlush()
+        this.clearSessionCap()
         // The server reveals the exact target only now: snap into place instantly.
         this.applyPos(action.target.x, action.target.y, false)
         this.analytics.track('puzzle_solved', { project: this.project })
@@ -196,6 +227,8 @@ export class PuzzleController {
     const dispose = () => {
       closedByUs = true
       this.cancelRaf()
+      this.stopFlush()
+      this.clearSessionCap()
       ws.close()
       if (this.ws === ws) this.ws = null
     }
@@ -212,8 +245,13 @@ export class PuzzleController {
 
   /** Reset to a fresh challenge and reconnect — the "give it another go" action.
    *  Used when the solve token expires (or a connection drops): a new socket
-   *  yields a new puzzle and, on solve, a new single-use token. */
+   *  yields a new puzzle and, on solve, a new single-use token. Capped: once the
+   *  retry budget is spent we do NOT reconnect — the terminal error state stands
+   *  (the view disables the CTA and asks the user to refresh). The budget refills
+   *  on a successful reconnect (the `ready` action). */
   retry = (): void => {
+    if (this.store.getState().retriesLeft <= 0) return
+    // `reset` decrements the budget; reconnect for a fresh challenge.
     this.store.dispatch({ type: 'reset' })
     this.connect()
   }
@@ -310,6 +348,10 @@ export class PuzzleController {
     this.moved = false
     this.store.dispatch({ type: 'dragStart' })
     this.pending = p
+    // Fresh grab: the first sample should always buffer (no stale delta anchor),
+    // and the batched-transmit loop runs for the life of the gesture.
+    this.lastBuffered = null
+    this.startFlush()
     // The page can scroll under an active drag (mobile rubber-band, a second
     // finger, momentum). A scroll moves the board without firing a pointermove,
     // so re-derive the board-relative position from the live pointer + a fresh
@@ -370,6 +412,13 @@ export class PuzzleController {
     // so the up decision can never disagree with the live hot/unsolve tracking.
     const centre = { x: up.x + this.offset.x, y: up.y + this.offset.y }
 
+    // Flush the final position immediately so it isn't delayed by the batch
+    // window, and never let the delta-gate drop the release sample (force=true)
+    // — the server's human-motion gate must see where the drag actually ended.
+    this.bufferSample(centre.x, centre.y, true)
+    this.flushSamples()
+    this.stopFlush()
+
     // One pure decision yields two INDEPENDENT outcomes: a reveal toggle (was it
     // a stationary click?) and a placement (pure geometry). Applying them
     // separately is what fixes the old bug where a sub-slop nudge was treated as
@@ -425,8 +474,10 @@ export class PuzzleController {
       // Keep the grab point under the pointer (centre = pointer + offset).
       const x = p.x + this.offset.x
       const y = p.y + this.offset.y
+      // Local drag render runs every frame for 60fps; the socket send is what we
+      // batch. Buffer this frame's sample (delta-gated) for the next flush.
       this.applyPos(x, y, false)
-      this.send({ type: 'move', x, y })
+      this.bufferSample(x, y, false)
     }
     this.raf = requestAnimationFrame(this.pump)
   }
@@ -496,9 +547,82 @@ export class PuzzleController {
     window.removeEventListener('scroll', this.onScroll, { capture: true })
   }
 
-  private send = (msg: Record<string, unknown>): void => {
+  private send = (msg: ClientMessage): void => {
     const ws = this.ws
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
+  }
+
+  // Buffer a sample for the next batched flush. Sub-threshold moves are dropped
+  // (delta-gate) to shed idle jitter; `force` bypasses the gate so the release
+  // sample is always kept.
+  private bufferSample = (x: number, y: number, force: boolean): void => {
+    if (!force) {
+      const w = this.dims.w || 1
+      const threshold = MIN_SAMPLE_DELTA_PX / w
+      const last = this.lastBuffered
+      if (last && Math.hypot(x - last.x, y - last.y) < threshold) return
+    }
+    const sample = { x, y }
+    this.sampleBuffer.push(sample)
+    this.lastBuffered = sample
+  }
+
+  // Transmit (and clear) the buffered samples as one `move` frame.
+  private flushSamples = (): void => {
+    if (this.sampleBuffer.length === 0) return
+    const samples = this.sampleBuffer
+    this.sampleBuffer = []
+    this.send({ type: 'move', samples })
+  }
+
+  private startFlush = (): void => {
+    if (this.flushTimer != null || typeof setInterval === 'undefined') return
+    this.flushTimer = setInterval(this.flushSamples, BATCH_INTERVAL_MS)
+  }
+
+  private stopFlush = (): void => {
+    if (this.flushTimer != null) {
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
+    }
+  }
+
+  private armSessionCap = (): void => {
+    this.clearSessionCap()
+    if (typeof setTimeout === 'undefined') return
+    const t = setTimeout(this.onSessionExpired, SESSION_CAP_MS)
+    // In Node (tests) keep a pending cap from holding the event loop open.
+    ;(t as { unref?: () => void }).unref?.()
+    this.sessionTimer = t
+  }
+
+  private clearSessionCap = (): void => {
+    if (this.sessionTimer != null) {
+      clearTimeout(this.sessionTimer)
+      this.sessionTimer = null
+    }
+  }
+
+  // The pre-win session outlived its cap: stop transmitting and stop the drag-
+  // solve loop, then surface the retryable error path so the user can start a
+  // fresh challenge. Once won there's nothing to cap (socket already detached).
+  private onSessionExpired = (): void => {
+    this.sessionTimer = null
+    if (this.store.getState().won) return
+    this.dragging = false
+    this.removeScrollWatch()
+    this.cancelRaf()
+    this.stopFlush()
+    this.sampleBuffer = []
+    this.lastBuffered = null
+    this.store.dispatch({
+      type: 'error',
+      message: 'puzzle timed out \u2014 give it another go',
+      retry: true,
+    })
+    // Close the socket; the server enforces its own (slightly longer) cap too.
+    this.teardown?.()
+    this.teardown = null
   }
 
   private cancelRaf = (): void => {
