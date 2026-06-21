@@ -5,7 +5,7 @@ import { initialPuzzleState, puzzleReducer } from '../lib/puzzle/store'
 import type { PuzzleAction, PuzzleState } from '../lib/puzzle/types'
 import type { PuzzleActions, PuzzleRefs } from '../lib/puzzle/use_puzzle'
 import { ASPECT, PuzzleView, type PuzzleViewProps } from './puzzle_view'
-import targetsData from '../worker/src/targets.json'
+import targetsData from '../worker/src/targets.example.json'
 
 // Build a real PuzzleState by replaying actions through the real reducer, then
 // derive the view model exactly as the app does — so every story is faithful.
@@ -16,11 +16,11 @@ const vmFrom = (...actions: PuzzleAction[]) => selectViewModel(state(...actions)
 
 const BOARD_W = 392 // 440px modal − 2×24px padding
 
-// Solved stories place the shard at its *true* target so the crop blends
-// seamlessly into the photo, exactly as a real solve looks. Targets come from
-// the gitignored worker/src/targets.json (the secret answer coords; CI swaps in
-// targets.example.json). Pick a piece near the photo's centre for framing, and
-// degrade gracefully when only the single-target example is present.
+// Solved stories place the shard at a representative target so the crop blends
+// into the photo, like a real solve. We use the checked-in targets.example.json
+// (NOT the gitignored real targets.json — the secret answer coords must never
+// enter the frontend build graph). Pick a piece near the photo's centre for
+// framing, and degrade gracefully when only the single-target example is present.
 const TARGETS = (targetsData.targets ?? []) as ReadonlyArray<{
   x: number
   y: number

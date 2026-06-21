@@ -16,9 +16,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # targets.json holds the secret answer coords (gitignored) but is imported
-      # by the puzzle stories; use the checked-in example so tsc/build resolve it.
-      - run: cp worker/src/targets.example.json worker/src/targets.json
       - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm test
