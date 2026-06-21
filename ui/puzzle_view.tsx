@@ -85,23 +85,6 @@ export const PuzzleView = ({
           className="relative w-full cursor-pointer select-none overflow-hidden border border-[rgba(255,255,255,0.14)]"
           style={{ aspectRatio: '630 / 840' }}
         >
-          {/* Sits behind the photo, clipped to the board — guaranteed to render
-              behind the puzzle picture. Only ever glimpsed in the esoteric gap
-              before the webp paints (or via inspection); never floats in the
-              backdrop. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 flex select-none items-center justify-center px-4 text-center lowercase leading-[1.15] tracking-[-0.01em] text-primary"
-          >
-            <span>
-              <span className="block text-[18px] font-normal">
-                and it{'\u2019'}s like
-              </span>
-              <span className="block text-[18px] font-normal">
-                {'\u201c'}no, not really{'\u201d'}
-              </span>
-            </span>
-          </div>
           <img
             src={IMG}
             alt="clouds from above"
