@@ -85,7 +85,6 @@ export const selectViewModel = (s: PuzzleState): PuzzleViewModel => {
     canSubmit: formActive && !s.submitting && s.token != null,
     solved,
     instruction: solved ? INSTRUCTION_SOLVED : INSTRUCTION_PLAYING,
-    connectingLabel: s.error ?? 'warming up\u2026',
     submitLabel: s.submitting ? 'sending\u2026' : 'join the list \u27e1',
   }
 }

@@ -68,7 +68,7 @@ export interface PuzzleViewModel {
   connecting: boolean // socket not ready yet
   done: boolean // signed up — show the thank-you
   error: string | null
-  errorRetry: boolean // show a "give it another go" CTA that resets the puzzle
+  errorRetry: boolean // show a "try again" CTA that resets the puzzle
   // shard visuals
   shardWhite: boolean // white edge vs grey
   shadeHidden: boolean // drop the 20% shading
@@ -90,7 +90,6 @@ export interface PuzzleViewModel {
   // copy
   solved: boolean
   instruction: string
-  connectingLabel: string
   submitLabel: string
 }
 

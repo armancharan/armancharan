@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import type { Point, PuzzleViewModel } from '../lib/puzzle/types'
 import type { PuzzleActions, PuzzleRefs } from '../lib/puzzle/use_puzzle'
+import { LoadingLine } from './loading_line'
 
 export const IMG = '/nuke-cloud.webp'
 export const ASPECT = 840 / 630 // portrait source image
@@ -103,15 +104,19 @@ export const PuzzleView = ({
         </div>
 
         {vm.connecting ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/70 px-4 text-center">
-            <span className="text-[13px] text-primary">{vm.connectingLabel}</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/70 px-4 text-center text-primary">
+            {vm.error ? (
+              <span className="text-[13px]">{vm.error}</span>
+            ) : (
+              <LoadingLine />
+            )}
             {vm.errorRetry ? (
               <button
                 type="button"
                 onClick={actions.retry}
-                className="cursor-pointer text-[13px] text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+                className="cursor-pointer text-[13px] text-primary underline decoration-from-font transition-opacity hover:opacity-70"
               >
-                give it another go
+                try again
               </button>
             ) : null}
           </div>
@@ -227,9 +232,9 @@ export const PuzzleView = ({
                     <button
                       type="button"
                       onClick={actions.retry}
-                      className="cursor-pointer text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+                      className="cursor-pointer text-primary underline decoration-from-font transition-opacity hover:opacity-70"
                     >
-                      give it another go
+                      try again
                     </button>
                   </>
                 ) : null}
