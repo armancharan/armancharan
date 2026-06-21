@@ -3,7 +3,7 @@
 // The Worker gates `/puzzle` (WebSocket) and `/subscribe` on the request Origin.
 // Exact-match-only was a foot-gun: every new origin (a dev subdomain, a Vercel
 // preview URL like `arman-charan-git-*.vercel.app`) silently 403s the socket,
-// which the client can only surface as "could not reach the puzzle". This adds
+// which the client can only surface as "failed to load puzzle". This adds
 // single-label subdomain wildcards (e.g. `https://*.armancharan.com`,
 // `https://*.vercel.app`) so those origins work without redeploying per URL.
 //

@@ -133,7 +133,7 @@ export class PuzzleController {
       this.logger.logError('connect', err, { url })
       this.store.dispatch({
         type: 'error',
-        message: 'could not reach the puzzle',
+        message: 'failed to load puzzle',
         retry: true,
       })
       return () => {}
@@ -185,7 +185,7 @@ export class PuzzleController {
         this.logger.logError('connect', ev, { url, type: ev.type })
         this.store.dispatch({
           type: 'error',
-          message: 'could not reach the puzzle',
+          message: 'failed to load puzzle',
           retry: true,
         })
       }
