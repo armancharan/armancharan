@@ -16,6 +16,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Generate the real targets.json + piece crops from puzzle.config.json
+      # (sharp is installed by `npm ci`; public/nuke-cloud.png is committed).
+      # This exercises the generator AND produces real data for the
+      # data-consistency test — replacing the old destructive `cp example` that
+      # could silently mask a clobbered targets.json.
+      - run: node scripts/generate-pieces.mjs
       - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm test
