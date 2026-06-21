@@ -7,6 +7,7 @@
 // (samples, path, duration) so behavioural checks are server-truth, and on a
 // legitimate drop it mints an HMAC-signed token the Vercel API trusts.
 
+import { isOriginAllowed, parseAllowList } from '../../lib/origin'
 import { logError } from './logging'
 import config from './targets.json'
 
@@ -16,6 +17,11 @@ export interface Env {
   ALLOWED_ORIGINS?: string
   DB: D1Database
   TURNSTILE_SECRET?: string
+  // Native Cloudflare Workers Rate Limiting bindings (durable, cross-isolate,
+  // per-colo counters). Optional so dev/test without the binding fails open.
+  // Limits/windows are configured in wrangler.toml ([ratelimits.simple]).
+  PUZZLE_RATE_LIMITER?: RateLimit
+  SUBSCRIBE_RATE_LIMITER?: RateLimit
 }
 
 const TARGETS = config.targets as Array<{ x: number; y: number }>
@@ -63,14 +69,11 @@ const mintToken = async (secret: string): Promise<string> => {
   return `${p}.${b64url(new Uint8Array(sig))}`
 }
 
-const originAllowed = (req: Request, env: Env): boolean => {
-  const allow = env.ALLOWED_ORIGINS?.split(',')
-    .map(o => o.trim())
-    .filter(Boolean)
-  if (!allow || allow.length === 0) return true // permissive in dev
-  const origin = req.headers.get('Origin')
-  return Boolean(origin && allow.includes(origin))
-}
+// Empty allowlist = permissive (dev). Otherwise exact origins plus single-label
+// subdomain wildcards (e.g. https://*.armancharan.com, https://*.vercel.app) so
+// dev subdomains and Vercel preview deployments aren't silently 403'd.
+const originAllowed = (req: Request, env: Env): boolean =>
+  isOriginAllowed(req.headers.get('Origin'), parseAllowList(env.ALLOWED_ORIGINS))
 
 export class PuzzleRoom {
   private state: DurableObjectState
@@ -138,9 +141,12 @@ export class PuzzleRoom {
     }
 
     // We keep receiving the pointer stream so behaviour (samples/path/duration)
-    // is measured server-side. The only thing sent back is a single `hot`
-    // boolean (are you within tolerance), so the shard's border can lock white —
-    // no coordinates and no warmer/colder gradient to gradient-ascend.
+    // is measured server-side, but we send NOTHING back per move. A per-move
+    // "within tolerance" boolean inherently leaks the target to ~tolerance
+    // precision: a script can sweep the board and binary-search the disc to
+    // triangulate the answer without ever moving like a human. The shard reveals
+    // its own crop, so a human still places it by eye against the visible photo;
+    // the authoritative on-target + behavioural check happens only on release.
     if (msg.type === 'move' && typeof msg.x === 'number' && typeof msg.y === 'number') {
       const now = Date.now()
       if (!s.firstT) s.firstT = now
@@ -150,9 +156,6 @@ export class PuzzleRoom {
       s.lastX = msg.x
       s.lastY = msg.y
       ws.serializeAttachment(s)
-
-      const hot = Math.hypot(msg.x - s.tx, msg.y - s.ty) <= TOLERANCE
-      ws.send(JSON.stringify({ type: 'prox', hot }))
       return
     }
 
@@ -192,17 +195,13 @@ export class PuzzleRoom {
       }
 
       ws.serializeAttachment(s)
-      // On an on-target miss (the drop was within tolerance but the movement
-      // didn't clear the behavioural floor) we hand back the exact target so the
-      // client can snap the shard cleanly into place. This leaks nothing the
-      // live `hot` signal didn't already reveal, and a solve still requires
-      // passing the behavioural check. A 'far' miss carries no coordinates.
+      // A miss never carries coordinates. We distinguish an on-target-but-not-
+      // human drop ('behavior') from a genuine miss ('far') only so the client
+      // can word the hint, but the exact target is never revealed until an
+      // authoritative solve — otherwise repeated near-misses would hand out the
+      // answer for free. The client never snaps to a missed target.
       ws.send(
-        JSON.stringify(
-          onTarget
-            ? { type: 'miss', reason: 'behavior', target: { x: s.tx, y: s.ty } }
-            : { type: 'miss', reason: 'far' },
-        ),
+        JSON.stringify({ type: 'miss', reason: onTarget ? 'behavior' : 'far' }),
       )
       if (s.attempts >= MAX_ATTEMPTS) ws.close(1008, 'too_many_attempts')
       return
@@ -227,20 +226,30 @@ export class PuzzleRoom {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SOLVE_TTL_MS = 3 * 60 * 1000 // must match the token's iat window
 
-// Per-isolate, per-IP throttle. A first line of defence paired with the
-// single-use solve token; not a global guarantee.
-const rl = new Map<string, { n: number; reset: number }>()
-const rateLimit = (key: string, limit: number, windowMs: number): boolean => {
-  const now = Date.now()
-  const e = rl.get(key)
-  if (!e || e.reset < now) {
-    rl.set(key, { n: 1, reset: now + windowMs })
-    return true
+// Durable, cross-isolate, per-IP throttle backed by the native Cloudflare
+// Workers Rate Limiting binding. Counters live in Cloudflare's edge (per colo),
+// so reconnecting or hopping isolates can't reset the budget — unlike the old
+// per-isolate Map. Limits/windows are set in wrangler.toml ([ratelimits.simple]).
+//
+// Returns true when the request is OVER the limit (should be rejected). Fails
+// open when the binding is absent (local dev / tests without the binding), which
+// is acceptable: Turnstile and the single-use solve token remain the backstop.
+const isRateLimited = async (
+  limiter: RateLimit | undefined,
+  key: string,
+): Promise<boolean> => {
+  if (!limiter) return false
+  try {
+    const { success } = await limiter.limit({ key })
+    return !success
+  } catch {
+    // A limiter error must not take the endpoint down; fail open.
+    return false
   }
-  if (e.n >= limit) return false
-  e.n += 1
-  return true
 }
+
+const clientIp = (req: Request): string =>
+  req.headers.get('CF-Connecting-IP') || 'unknown'
 
 const corsHeaders = (origin: string): Record<string, string> => ({
   'Access-Control-Allow-Origin': origin || '*',
@@ -258,6 +267,17 @@ const jsonResponse = (
     status,
     headers: { 'content-type': 'application/json', ...corsHeaders(origin) },
   })
+
+// Constant-time string comparison for the HMAC signature, mirroring the
+// timingSafeEqual approach: XOR-accumulate over the full length so the time
+// taken never depends on WHERE the first mismatching byte is. A length
+// mismatch can short-circuit (the expected signature length is fixed/public).
+const timingSafeEqual = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
 
 const fromB64url = (s: string): string => {
   const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
@@ -290,7 +310,7 @@ const verifySolveToken = async (
   const expected = b64url(
     new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(p))),
   )
-  if (expected !== sig) return { ok: false, reason: 'bad_sig' }
+  if (!timingSafeEqual(expected, sig)) return { ok: false, reason: 'bad_sig' }
 
   try {
     const payload = JSON.parse(fromB64url(p)) as {
@@ -337,8 +357,8 @@ const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
   if (!originAllowed(req, env)) return new Response('forbidden origin', { status: 403 })
   if (req.method !== 'POST') return jsonResponse({ ok: false, reason: 'method' }, 405, origin)
 
-  const ip = req.headers.get('CF-Connecting-IP') || 'unknown'
-  if (!rateLimit(`sub:${ip}`, 5, 60_000)) {
+  const ip = clientIp(req)
+  if (await isRateLimited(env.SUBSCRIBE_RATE_LIMITER, ip)) {
     return jsonResponse({ ok: false, reason: 'rate_limited' }, 429, origin)
   }
 
@@ -385,7 +405,7 @@ const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
     }
   } catch (err) {
     logError('subscribe.claim_token', err, { jti: tok.jti })
-    return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
+    return jsonResponse({ ok: false, reason: 'storage_error' }, 502, origin)
   }
 
   try {
@@ -399,7 +419,7 @@ const handleSubscribe = async (req: Request, env: Env): Promise<Response> => {
     return jsonResponse({ ok: true, duplicate }, 200, origin)
   } catch (err) {
     logError('subscribe.insert_subscriber', err, { email })
-    return jsonResponse({ ok: false, reason: 'storage_error', detail: String(err) }, 502, origin)
+    return jsonResponse({ ok: false, reason: 'storage_error' }, 502, origin)
   }
 }
 
@@ -421,6 +441,17 @@ export default {
 
     if (!originAllowed(req, env)) {
       return new Response('forbidden origin', { status: 403 })
+    }
+
+    // Per-IP cap on socket upgrades. Without this, every reconnect spawns a
+    // fresh Durable Object room with a fresh attempt budget, so the attempt cap
+    // is trivially reset and room creation is unbounded per IP. The durable
+    // counter survives reconnects and isolate hops.
+    if (await isRateLimited(env.PUZZLE_RATE_LIMITER, clientIp(req))) {
+      return new Response('rate limited', {
+        status: 429,
+        headers: { 'Retry-After': '60' },
+      })
     }
 
     // Each connection is its own short-lived room holding one secret target.

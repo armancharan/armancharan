@@ -1,6 +1,6 @@
 name = "arman-puzzle"
 main = "src/index.ts"
-compatibility_date = "2024-11-01"
+compatibility_date = "2026-06-01"
 
 # The puzzle session lives in a Durable Object. SQLite-backed classes are the
 # current default and are required for the WebSocket hibernation API used here.
@@ -14,14 +14,58 @@ class_name = "PuzzleRoom"
 
 # Subscriber storage. The /subscribe endpoint writes signups here directly via
 # the native binding (no API token, no read-only-filesystem fallback).
+#
+# `migrations_dir` is REQUIRED: the schema lives in the repo-root `db/migrations`
+# (shared with the Next app), not the wrangler default of `worker/migrations`.
+# Without this, `wrangler d1 migrations apply` finds no migrations and the prod
+# tables (subscribers, used_solve_tokens) are never created — so /subscribe fails
+# with `storage_error` even though the puzzle (Durable Object) works fine.
 [[d1_databases]]
 binding = "DB"
 database_name = "arman-subscribers"
 database_id = "17a3fc5e-8882-41a0-b438-40df97ec9c26"
+migrations_dir = "../db/migrations"
 
 [observability]
 enabled = true
 
+# Native Cloudflare Workers Rate Limiting bindings: durable, cross-isolate,
+# per-colo counters keyed by client IP. Tune the limit/period here — `period`
+# must be 10 or 60 (seconds). Separate namespaces keep the two endpoints' budgets
+# independent. The code fails open if a binding is absent (local dev / tests).
+#
+#   PUZZLE_RATE_LIMITER    — caps /puzzle WebSocket upgrades per IP. Without this,
+#                            each reconnect spawns a fresh Durable Object room with
+#                            a fresh attempt budget (cap trivially reset; unbounded
+#                            room creation). Generous for humans (retry/StrictMode
+#                            double-mount), tight enough to stop reconnect floods.
+[[ratelimits]]
+name = "PUZZLE_RATE_LIMITER"
+namespace_id = "1001"
+[ratelimits.simple]
+limit = 30
+period = 60
+
+#   SUBSCRIBE_RATE_LIMITER — caps /subscribe POSTs per IP (replaces the old
+#                            per-isolate in-memory throttle).
+[[ratelimits]]
+name = "SUBSCRIBE_RATE_LIMITER"
+namespace_id = "1002"
+[ratelimits.simple]
+limit = 5
+period = 60
+
+# Origin allowlist for /puzzle and /subscribe. Codified here (it is NOT a secret)
+# so it is version-controlled and can never silently fall back to "allow all".
+# Vercel previews are scoped to THIS project's prefixes rather than all of
+# *.vercel.app. Local dev overrides this with an empty value via worker/.dev.vars
+# (empty = permissive) so localhost origins aren't 403'd.
+[vars]
+ALLOWED_ORIGINS = "https://armancharan.com,https://*.armancharan.com,https://arman-charan-*.vercel.app,https://armancharan-*.vercel.app"
+
 # Secrets (set with `wrangler secret put` in production, or worker/.dev.vars locally):
 #   PUZZLE_SECRET    — must match the Vercel PUZZLE_SECRET so solve tokens verify
-#   ALLOWED_ORIGINS  — comma-separated allowlist (e.g. https://armancharan.com); empty = allow all
+#   TURNSTILE_SECRET — Turnstile server-side verification key (optional)
+# NOTE: ALLOWED_ORIGINS is now a [vars] entry above, not a secret. If a secret of
+# the same name was previously set, delete it (`wrangler secret delete
+# ALLOWED_ORIGINS`) so the version-controlled value takes effect.
