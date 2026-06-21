@@ -11,7 +11,10 @@ node_modules
 *.tsbuildinfo
 .npmrc
 
-# Secret puzzle answer coordinates — generated locally, deployed to the Worker,
-# never committed (this repo is public). Regenerate with scripts/generate-pieces.mjs.
-worker/src/targets.json
+# NOTE: worker/src/targets.json is now COMMITTED as the single source of truth
+# for the puzzle answer set. It is deliberately not a secret — the crops in
+# public/pieces already reveal each shard's region, and the security model never
+# relied on hiding the coordinate JSON (the answer is withheld from the client at
+# RUNTIME by the Worker, which sends shards by index only). Committing it stops
+# the file from silently drifting/being clobbered and changing prod answers.
 cloudflared/

@@ -16,11 +16,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Generate the real targets.json + piece crops from puzzle.config.json
-      # (sharp is installed by `npm ci`; public/nuke-cloud.png is committed).
-      # This exercises the generator AND produces real data for the
-      # data-consistency test — replacing the old destructive `cp example` that
-      # could silently mask a clobbered targets.json.
+      # Deterministically re-render the piece crops + manifest FROM the committed
+      # worker/src/targets.json (sharp is installed by `npm ci`; nuke-cloud.png is
+      # committed). This does NOT resample/invent answers — it exercises the
+      # generator and lets the data-consistency test verify pieces↔targets agree.
       - run: node scripts/generate-pieces.mjs
       - run: npx next typegen
       - run: npx tsc --noEmit
@@ -41,7 +40,6 @@ jobs:
           cache: npm
           cache-dependency-path: worker/package-lock.json
       - run: npm ci
-      # targets.json holds the secret answer coords (gitignored); use the
-      # checked-in example so tsc can resolve the import in CI.
-      - run: cp src/targets.example.json src/targets.json
+      # worker/src/targets.json is committed (the single source of truth for the
+      # answer set), so tsc resolves the import directly — no `cp example` needed.
       - run: npm run typecheck

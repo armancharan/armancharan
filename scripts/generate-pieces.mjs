@@ -1,16 +1,25 @@
-// Samples the puzzle's secret target points from a configured region of the
-// photo and pre-renders the matching "shard" crops. The browser only ever
-// receives these opaque crops (by index) — never the coordinates — so the answer
-// mapping stays server-side.
+// Pre-renders the puzzle's "shard" crops and binds them to the committed answer
+// set. The browser only ever receives these opaque crops (by index) — never the
+// coordinates — so the answer mapping stays server-side at runtime.
 //
-// Edit worker/src/puzzle.config.json (region / count / spacing), then run:
+// targets.json (worker/src/targets.json) is the COMMITTED single source of truth
+// for the answer coordinates. By default this script is DETERMINISTIC: it reads
+// the committed targets and renders the matching crops — it does NOT invent new
+// random targets. So routine runs (and CI) change neither answers nor pieces.
 //
-//   node scripts/generate-pieces.mjs
+// Modes:
+//   node scripts/generate-pieces.mjs                 # derive: render crops + manifest FROM committed targets.json
+//   node scripts/generate-pieces.mjs --manifest-only # only (re)write the pieces manifest (no re-render)
+//   node scripts/generate-pieces.mjs --resample      # RE-SAMPLE new random targets (changes prod answers!) then render
 //
-// It writes worker/src/targets.json (consumed by the Worker) and public/pieces.
+// Resampling is the only thing that changes the answers; it writes a fresh
+// targets.json and must be committed deliberately. Edit worker/src/puzzle.config.json
+// (region / count / spacing) first, then run with --resample.
 //
 import sharp from 'sharp'
 import { mkdir, readFile, rm, writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -19,17 +28,40 @@ const SRC = join(root, 'public', 'nuke-cloud.png')
 const OUT_DIR = join(root, 'public', 'pieces')
 const CONFIG = join(root, 'worker', 'src', 'puzzle.config.json')
 const TARGETS = join(root, 'worker', 'src', 'targets.json')
+const MANIFEST = join(OUT_DIR, 'manifest.json')
 
-const cfg = JSON.parse(await readFile(CONFIG, 'utf8'))
-const { radius, tolerance, count, region } = cfg
-const minSpacing = cfg.minSpacing ?? 0.06
+const args = new Set(process.argv.slice(2))
+const RESAMPLE = args.has('--resample')
+const MANIFEST_ONLY = args.has('--manifest-only')
 
-const rnd = (a, b) => a + Math.random() * (b - a)
 const round = n => Math.round(n * 1000) / 1000
 
+// Canonical content hash binding the rendered crops to the exact answer set.
+// MUST stay byte-identical to the implementation in
+// lib/puzzle/data_consistency.test.ts — the test recomputes this from the
+// committed targets.json and fails CI if it diverges from the manifest, so any
+// accidental drift between the two is caught rather than shipped.
+const targetsHash = (radius, tolerance, targets) =>
+  createHash('sha256')
+    .update(
+      JSON.stringify({
+        radius,
+        tolerance,
+        targets: targets.map(t => ({ x: t.x, y: t.y })),
+      }),
+    )
+    .digest('hex')
+    .slice(0, 16)
+
+const cfg = JSON.parse(await readFile(CONFIG, 'utf8'))
+
 // Rejection-sample `count` points inside the region, keeping them spaced out.
-// Relax the spacing if the region is too tight to fit them all.
-const sample = () => {
+// Relax the spacing if the region is too tight to fit them all. ONLY used in
+// --resample mode (or when bootstrapping a repo with no targets.json yet).
+const sampleTargets = () => {
+  const { count, region } = cfg
+  const minSpacing = cfg.minSpacing ?? 0.06
+  const rnd = (a, b) => a + Math.random() * (b - a)
   for (let spacing = minSpacing; spacing >= 0.01; spacing -= 0.01) {
     const pts = []
     for (let attempt = 0; attempt < count * 400 && pts.length < count; attempt++) {
@@ -39,49 +71,88 @@ const sample = () => {
         pts.push({ x, y })
       }
     }
-    if (pts.length === count) return pts
+    if (pts.length === count) return pts.map(p => ({ x: round(p.x), y: round(p.y) }))
   }
   throw new Error(`could not place ${count} points in region with any spacing`)
 }
 
-const targets = sample().map(p => ({ x: round(p.x), y: round(p.y) }))
+let radius
+let tolerance
+let targets
 
-const meta = await sharp(SRC).metadata()
-const W = meta.width
-const H = meta.height
-const side = Math.round(2 * radius * W)
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
-
-await rm(OUT_DIR, { recursive: true, force: true })
-await mkdir(OUT_DIR, { recursive: true })
-
-for (let i = 0; i < targets.length; i++) {
-  const t = targets[i]
-  const left = clamp(Math.round(t.x * W - side / 2), 0, W - side)
-  const top = clamp(Math.round(t.y * H - side / 2), 0, H - side)
-  await sharp(SRC)
-    .extract({ left, top, width: side, height: side })
-    .resize(240, 240)
-    .webp({ quality: 82 })
-    .toFile(join(OUT_DIR, `piece-${i}.webp`))
-  console.log(`piece-${i}.webp  <-  (${t.x}, ${t.y})  [${left},${top} ${side}x${side}]`)
+if (RESAMPLE || !existsSync(TARGETS)) {
+  // The ONLY path that changes the answers. Sample fresh and write targets.json.
+  radius = cfg.radius
+  tolerance = cfg.tolerance
+  targets = sampleTargets()
+  await writeFile(
+    TARGETS,
+    JSON.stringify(
+      {
+        note: 'GENERATED by scripts/generate-pieces.mjs from worker/src/puzzle.config.json — do not edit by hand.',
+        radius,
+        tolerance,
+        targets,
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+  console.log(`re-sampled ${targets.length} targets → ${TARGETS}`)
+} else {
+  // DETERMINISTIC default: derive crops from the committed answer set as-is.
+  const committed = JSON.parse(await readFile(TARGETS, 'utf8'))
+  radius = committed.radius
+  tolerance = committed.tolerance
+  targets = committed.targets
 }
 
-await writeFile(
-  TARGETS,
-  JSON.stringify(
-    {
-      note: 'GENERATED by scripts/generate-pieces.mjs from worker/src/puzzle.config.json — do not edit by hand.',
-      radius,
-      tolerance,
-      targets,
-    },
-    null,
-    2,
-  ) + '\n',
-)
+const writeManifest = async () => {
+  await mkdir(OUT_DIR, { recursive: true })
+  await writeFile(
+    MANIFEST,
+    JSON.stringify(
+      {
+        note: 'GENERATED by scripts/generate-pieces.mjs — binds public/pieces to worker/src/targets.json. Do not edit by hand.',
+        targetsHash: targetsHash(radius, tolerance, targets),
+        count: targets.length,
+        radius,
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+}
 
-console.log(
-  `\n${targets.length} pieces written to public/pieces; targets.json updated ` +
-    `(region x[${region.x}] y[${region.y}], source ${W}x${H}, crop ${side}px)`,
-)
+if (MANIFEST_ONLY) {
+  await writeManifest()
+  console.log(`manifest-only: wrote ${MANIFEST} (no crops re-rendered)`)
+} else {
+  const meta = await sharp(SRC).metadata()
+  const W = meta.width
+  const H = meta.height
+  const side = Math.round(2 * radius * W)
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
+
+  await rm(OUT_DIR, { recursive: true, force: true })
+  await mkdir(OUT_DIR, { recursive: true })
+
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i]
+    const left = clamp(Math.round(t.x * W - side / 2), 0, W - side)
+    const top = clamp(Math.round(t.y * H - side / 2), 0, H - side)
+    await sharp(SRC)
+      .extract({ left, top, width: side, height: side })
+      .resize(240, 240)
+      .webp({ quality: 82 })
+      .toFile(join(OUT_DIR, `piece-${i}.webp`))
+    console.log(`piece-${i}.webp  <-  (${t.x}, ${t.y})  [${left},${top} ${side}x${side}]`)
+  }
+
+  await writeManifest()
+
+  console.log(
+    `\n${targets.length} pieces + manifest written to public/pieces ` +
+      `(source ${W}x${H}, crop ${side}px, hash ${targetsHash(radius, tolerance, targets)})`,
+  )
+}
