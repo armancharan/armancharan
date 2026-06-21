@@ -126,7 +126,7 @@ export const PuzzleView = ({
               <button
                 type="button"
                 onClick={actions.retry}
-                className="text-[13px] text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+                className="cursor-pointer text-[13px] text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
               >
                 give it another go
               </button>
@@ -244,7 +244,7 @@ export const PuzzleView = ({
                     <button
                       type="button"
                       onClick={actions.retry}
-                      className="text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+                      className="cursor-pointer text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
                     >
                       give it another go
                     </button>
