@@ -9,7 +9,10 @@ export const NavigationBar = () => {
         sm:border-none
         sticky
         top-0
-        p-4
+        px-4
+        pb-4
+        pt-[calc(1rem+env(safe-area-inset-top))]
+        shadow-[0_-100px_0_0_var(--color-background)]
       ">
       <Link
         className="
