@@ -10,19 +10,25 @@
 //   - Turnstile's api.js (script) and challenge iframe (frame) are allowed.
 //   - images come from this origin (incl. the /_next/image optimizer, data: blur
 //     placeholders) and the S3 bucket behind remotePatterns.
+// In development Next/React + Turbopack rely on eval() (debugging, HMR) and a
+// websocket back to the dev server, so we relax script-src/connect-src for dev
+// only. Production stays strict — React never uses eval() in prod.
+const isDev = process.env.NODE_ENV !== 'production'
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://challenges.cloudflare.com",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://va.vercel-scripts.com https://challenges.cloudflare.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://s3.us-west-2.amazonaws.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://arman-puzzle.armancharan.workers.dev wss://arman-puzzle.armancharan.workers.dev https://challenges.cloudflare.com https://va.vercel-scripts.com",
+  `connect-src 'self'${isDev ? ' ws: http://localhost:*' : ''} https://arman-puzzle.armancharan.workers.dev wss://arman-puzzle.armancharan.workers.dev https://challenges.cloudflare.com https://va.vercel-scripts.com`,
   "frame-src https://challenges.cloudflare.com",
-  'upgrade-insecure-requests',
+  // Don't force-upgrade to https in dev — it breaks http://localhost.
+  ...(isDev ? [] : ['upgrade-insecure-requests']),
 ].join('; ')
 
 const securityHeaders = [
