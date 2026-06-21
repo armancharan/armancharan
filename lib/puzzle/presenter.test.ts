@@ -33,8 +33,8 @@ describe('interpretServerMessage', () => {
     )
     expect(a).toEqual({ type: 'ready', index: 2, seed: 7, radius: 0.2, tolerance: 0.05 })
   })
-  it('maps prox', () => {
-    expect(interpretServerMessage(JSON.stringify({ type: 'prox', hot: true }))).toEqual({
+  it('maps the server hot message onto the prox action', () => {
+    expect(interpretServerMessage(JSON.stringify({ type: 'hot', hot: true }))).toEqual({
       type: 'prox',
       hot: true,
     })

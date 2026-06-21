@@ -37,7 +37,8 @@ export const interpretServerMessage = (raw: string): PuzzleAction | null => {
         radius: msg.piece?.radius ?? DEFAULT_PIECE_RADIUS,
         tolerance: typeof msg.tolerance === 'number' ? msg.tolerance : 0.06,
       }
-    case 'prox':
+    case 'hot':
+      // The server's pre-win hotness preview maps onto the store's `prox` action.
       return { type: 'prox', hot: Boolean(msg.hot) }
     case 'solved':
       if (!msg.token || !msg.target) return null

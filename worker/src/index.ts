@@ -7,6 +7,7 @@
 // (samples, path, duration) so behavioural checks are server-truth, and on a
 // legitimate drop it mints an HMAC-signed token the Vercel API trusts.
 
+import { decideHot, hotJitter, type HotGateFloors } from '../../lib/puzzle/hot'
 import { isOriginAllowed, parseAllowList } from '../../lib/origin'
 import { logError } from './logging'
 import config from './targets.json'
@@ -35,6 +36,16 @@ const MIN_SAMPLES = 10
 const MIN_PATH = 0.12
 const MAX_ATTEMPTS = 8
 
+// Behavioural gate for the pre-win "hot" preview. Set to half the solve floors:
+// enough accrued samples, path, and time that an instantaneous binary-search
+// probe gets no signal, while a real human drag clears it well before reaching
+// the target. (The authoritative solve still requires the FULL floors above.)
+const HOT_GATE: HotGateFloors = {
+  minSamples: Math.ceil(MIN_SAMPLES / 2),
+  minPath: MIN_PATH / 2,
+  minMs: MIN_SOLVE_MS / 2,
+}
+
 type Session = {
   index: number
   tx: number
@@ -47,6 +58,10 @@ type Session = {
   lastY: number
   attempts: number
   solved: boolean
+  // Per-session multiplier (~[0.85, 1.15]) applied to the tolerance radius when
+  // deciding the "hot" preview. Fixed for the life of the session so the jitter
+  // can't be averaged away by probing; see lib/puzzle/hot.ts.
+  hotJitter: number
 }
 
 const b64url = (bytes: Uint8Array): string => {
@@ -113,6 +128,7 @@ export class PuzzleRoom {
       lastY: 0,
       attempts: 0,
       solved: false,
+      hotJitter: hotJitter(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32),
     }
     server.serializeAttachment(session)
     server.send(
@@ -141,12 +157,17 @@ export class PuzzleRoom {
     }
 
     // We keep receiving the pointer stream so behaviour (samples/path/duration)
-    // is measured server-side, but we send NOTHING back per move. A per-move
-    // "within tolerance" boolean inherently leaks the target to ~tolerance
-    // precision: a script can sweep the board and binary-search the disc to
-    // triangulate the answer without ever moving like a human. The shard reveals
-    // its own crop, so a human still places it by eye against the visible photo;
-    // the authoritative on-target + behavioural check happens only on release.
+    // is measured server-side, and we emit a per-move "hot" preview boolean so
+    // the client can show the white-shard feedback before the first win (it has
+    // no target to compute this locally). A naive "within tolerance" flag would
+    // leak the answer — a script could sweep the board and binary-search the disc
+    // to triangulate it — so the signal is hardened in lib/puzzle/hot.ts: it stays
+    // false until the drag clears a behavioural gate (so an instantaneous probe
+    // gets nothing), and the boundary is jittered per session (so the exact
+    // tolerance radius can't be pinpointed). This is acceptable because the
+    // authoritative on-target + behavioural check still happens only on release,
+    // and Turnstile + single-use D1 solve tokens + rate limiting + the attempt cap
+    // remain the real wall against abuse.
     if (msg.type === 'move' && typeof msg.x === 'number' && typeof msg.y === 'number') {
       const now = Date.now()
       if (!s.firstT) s.firstT = now
@@ -156,6 +177,20 @@ export class PuzzleRoom {
       s.lastX = msg.x
       s.lastY = msg.y
       ws.serializeAttachment(s)
+      // Don't drive hotness once already solved — post-win the client knows the
+      // target and computes the preview locally.
+      if (!s.solved) {
+        const hot = decideHot({
+          dist: Math.hypot(msg.x - s.tx, msg.y - s.ty),
+          tolerance: TOLERANCE,
+          jitter: s.hotJitter,
+          samples: s.samples,
+          path: s.path,
+          elapsedMs: now - s.firstT,
+          floors: HOT_GATE,
+        })
+        ws.send(JSON.stringify({ type: 'hot', hot }))
+      }
       return
     }
 

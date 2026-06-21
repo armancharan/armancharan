@@ -146,6 +146,11 @@ export class PuzzleController {
     ws.onmessage = ev => {
       const action = interpretServerMessage(ev.data)
       if (!action) return
+      // The server's pre-win hotness preview arrives as a `prox` action. Once the
+      // puzzle is won the target is cached and `onPointerMove` computes the preview
+      // locally (and the socket is detached anyway), so a late/in-flight server
+      // `hot` must never override that — drop it.
+      if (action.type === 'prox' && this.store.getState().won) return
       this.store.dispatch(action)
 
       if (action.type === 'ready') {
@@ -335,10 +340,11 @@ export class PuzzleController {
         this.store.dispatch({ type: 'dragMoved' })
       }
     }
-    // Before the first win, server `prox` drives hotness — nothing to do here.
-    // Once won, the target is cached, so we judge proximity locally (no socket):
-    // leaving the zone live-unplaces (form de-activates); a won-but-unplaced
-    // shard previews "hot" as it's dragged back in.
+    // Before the first win, the server's `hot` message drives hotness (the client
+    // has no target to judge against) — nothing to do here. Once won, the target
+    // is cached, so we judge proximity locally (no socket): leaving the zone
+    // live-unplaces (form de-activates); a won-but-unplaced shard previews "hot"
+    // as it's dragged back in.
     const st = this.store.getState()
     if (!st.won || !st.target) return
     const centre = { x: p.x + this.offset.x, y: p.y + this.offset.y }

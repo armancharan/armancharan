@@ -97,6 +97,8 @@ export interface PuzzleViewModel {
 // Server -> client wire messages.
 export type ServerMessage =
   | { type: 'ready'; index?: number; seed?: number; tolerance?: number; piece?: { radius?: number } }
-  | { type: 'prox'; hot?: boolean }
+  // Per-move pre-win hotness preview. Hardened server-side (gated + jittered) so
+  // it can't be used to triangulate the target — see worker/src/index.ts.
+  | { type: 'hot'; hot?: boolean }
   | { type: 'solved'; token?: string; target?: Point }
   | { type: 'miss'; reason?: string; target?: Point }

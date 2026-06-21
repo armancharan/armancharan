@@ -449,6 +449,110 @@ describe('PuzzleController drag-to-unset (local, post-win)', () => {
   })
 })
 
+// Pre-win, the client has no target, so the white "hot" preview is driven solely
+// by the server's per-move `hot` message arriving on the socket. These exercise
+// the controller's onmessage path (not a direct store dispatch) so the once-won
+// guard is covered too.
+describe('PuzzleController server-driven hot (pre-win)', () => {
+  class FakeSocket {
+    static OPEN = 1
+    readyState = 1
+    onmessage: ((ev: { data: string }) => void) | null = null
+    onerror: ((ev: unknown) => void) | null = null
+    onclose: ((ev: unknown) => void) | null = null
+    sent: string[] = []
+    closed = false
+    constructor(public url: string) {}
+    send(data: string): void {
+      this.sent.push(data)
+    }
+    close(): void {
+      this.closed = true
+    }
+  }
+
+  const connectWithFakeSocket = (): {
+    controller: PuzzleController
+    socket: FakeSocket
+    restore: () => void
+  } => {
+    const g = globalThis as unknown as { WebSocket?: unknown }
+    const prev = g.WebSocket
+    let socket!: FakeSocket
+    g.WebSocket = class extends FakeSocket {
+      constructor(url: string) {
+        super(url)
+        socket = this
+      }
+    }
+    const controller = new PuzzleController({
+      aspect: 1,
+      getBoardEl: () => null,
+      getPieceEl: () => null,
+      analytics: { track: () => {} },
+      logger: { logError: vi.fn() },
+      config: { wsUrl: () => 'wss://example.test/puzzle', siteKey: undefined },
+    })
+    controller.connect()
+    return { controller, socket, restore: () => (g.WebSocket = prev) }
+  }
+
+  const fireHot = (socket: FakeSocket, hot: boolean) =>
+    socket.onmessage?.({ data: JSON.stringify({ type: 'hot', hot }) })
+
+  it('lights and clears the shard from server hot messages while playing', () => {
+    const { controller, socket, restore } = connectWithFakeSocket()
+    try {
+      controller.store.dispatch({
+        type: 'ready',
+        index: 0,
+        seed: 1,
+        radius: 0.13,
+        tolerance: 0.06,
+      })
+      expect(controller.store.getState().hot).toBe(false)
+
+      fireHot(socket, true)
+      expect(controller.store.getState().hot).toBe(true)
+
+      fireHot(socket, false)
+      expect(controller.store.getState().hot).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  it('ignores a server hot message once the puzzle is won', () => {
+    const { controller, socket, restore } = connectWithFakeSocket()
+    try {
+      controller.store.dispatch({
+        type: 'ready',
+        index: 0,
+        seed: 1,
+        radius: 0.13,
+        tolerance: 0.06,
+      })
+      // Win, then locally un-place so phase is 'playing' again but won stays true.
+      controller.store.dispatch({
+        type: 'solved',
+        token: 'tok',
+        target: { x: 0.4, y: 0.5 },
+      })
+      controller.store.dispatch({ type: 'unsolve' })
+      const s = controller.store.getState()
+      expect(s.phase).toBe('playing')
+      expect(s.won).toBe(true)
+      expect(s.hot).toBe(false)
+
+      // A late/in-flight server hot must NOT override local post-win tracking.
+      fireHot(socket, true)
+      expect(controller.store.getState().hot).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+})
+
 describe('PuzzleController tap-vs-drag classification', () => {
   const ready = (c: PuzzleController) =>
     c.store.dispatch({
