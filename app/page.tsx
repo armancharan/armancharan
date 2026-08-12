@@ -5,8 +5,12 @@ import featherstonNumeroIv from '../public/featherston-numero-iv.png'
 import ivySmiling from '../public/ivy-smiling.png'
 import pestoPasta from '../public/pesto-pasta.png'
 import polly from '../public/polly.png'
+import tabawake from '../public/tabawake.jpg'
 import { CloudPuzzleSignup } from '../ui/cloud_puzzle'
 import { Page } from '../ui/page'
+
+/** Live tabawake app — update when the host lands. */
+const TABAWAKE_URL = 'https://tabawake.armancharan.com'
 
 const HomePage = () => {
   return (
@@ -25,6 +29,34 @@ const HomePage = () => {
       <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
         (Yeah) <Image src={polly} />
       </h1>
+
+      <section className="mt-32">
+        <div className="text-secondary text-[13px] mb-4">
+          {'tabawake \u2014 '}
+          <a
+            href={TABAWAKE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+          >
+            open {'\u2192'}
+          </a>
+        </div>
+        <a
+          href={TABAWAKE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full max-w-4xl transition-opacity hover:opacity-90"
+        >
+          <NextImage
+            src={tabawake}
+            alt="tabawake — keeps this tab awake"
+            placeholder="blur"
+            sizes="(max-width: 896px) 100vw, 896px"
+            className="border-2 border-[rgba(0,0,0,0.333)] w-full h-auto"
+          />
+        </a>
+      </section>
 
       <section className="mt-32">
         <div className="text-secondary text-[13px] mb-4">
