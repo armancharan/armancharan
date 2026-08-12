@@ -52,6 +52,7 @@ const nextConfig = {
       { protocol: 'https', hostname: 's3.us-west-2.amazonaws.com' },
     ],
     formats: ['image/avif', 'image/webp'],
+    qualities: [75, 100],
     minimumCacheTTL: 31536000,
   },
   async headers() {
