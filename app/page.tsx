@@ -37,7 +37,7 @@ const HomePage = () => {
             href={TABAWAKE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+            className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2"
           >
             open {'\u2192'}
           </a>

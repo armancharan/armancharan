@@ -9,6 +9,7 @@ export const NavigationBar = () => {
         sm:border-none
         sticky
         top-0
+        z-10
         px-4
         pb-4
         pt-[calc(1rem+env(safe-area-inset-top))]
