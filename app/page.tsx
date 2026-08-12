@@ -46,29 +46,29 @@ const HomePage = () => {
           href={TABAWAKE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full max-w-4xl"
+          className="block w-full max-w-4xl transition-opacity hover:opacity-90"
         >
           <NextImage
             src={tabawake}
             alt="tabawake — keeps this tab awake"
+            placeholder="blur"
             sizes="(max-width: 896px) 100vw, 896px"
-            quality={100}
             className="border-2 border-[rgba(0,0,0,0.333)] w-full h-auto"
           />
         </a>
       </section>
 
       <section className="mt-32">
-        <div className="text-secondary text-[13px] mb-4">
-          {'coming soon \u2014 agentic engineering 101 \u2014 '}
-          <CloudPuzzleSignup />
-        </div>
-        <NextImage
-          src={agenticEngineering101}
-          alt="agentic engineering 101"
-          placeholder="blur"
-          sizes="(max-width: 896px) 100vw, 896px"
-          className="border-2 border-[rgba(0,0,0,0.333)] w-full max-w-4xl h-auto"
+        <CloudPuzzleSignup
+          cover={
+            <NextImage
+              src={agenticEngineering101}
+              alt="agentic engineering 101"
+              placeholder="blur"
+              sizes="(max-width: 896px) 100vw, 896px"
+              className="border-2 border-[rgba(0,0,0,0.333)] w-full max-w-4xl h-auto"
+            />
+          }
         />
       </section>
     </Page>

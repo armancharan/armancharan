@@ -1,26 +1,47 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { usePuzzle } from '../lib/puzzle/use_puzzle'
 import { ASPECT, PuzzleView } from './puzzle_view'
 
-// Inline trigger that lives in the "coming soon" line and opens the modal.
-export const CloudPuzzleSignup = () => {
+/**
+ * "coming soon" line + optional cover image. Both open the same Express Interest
+ * modal (puzzle → signup), matching the tabawake image→link pattern.
+ */
+export const CloudPuzzleSignup = ({
+  cover,
+}: {
+  cover?: ReactNode
+} = {}) => {
   const [open, setOpen] = useState(false)
+  const openModal = () => {
+    track('express_interest_open', { project: 'agentic-engineering-101' })
+    setOpen(true)
+  }
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          track('express_interest_open', { project: 'agentic-engineering-101' })
-          setOpen(true)
-        }}
-        style={{ font: 'inherit' }}
-        className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
-      >
-        express interest {'\u2192'}
-      </button>
+      <div className="text-secondary text-[13px] mb-4">
+        {'coming soon \u2014 agentic engineering 101 \u2014 '}
+        <button
+          type="button"
+          onClick={openModal}
+          style={{ font: 'inherit' }}
+          className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+        >
+          express interest {'\u2192'}
+        </button>
+      </div>
+      {cover ? (
+        <button
+          type="button"
+          onClick={openModal}
+          aria-label="Express interest in agentic engineering 101"
+          className="block w-full max-w-4xl cursor-pointer appearance-none border-0 bg-transparent p-0 text-left"
+        >
+          {cover}
+        </button>
+      ) : null}
       {open ? (
         <Modal onClose={() => setOpen(false)}>
           <Puzzle onClose={() => setOpen(false)} />
