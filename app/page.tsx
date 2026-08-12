@@ -46,13 +46,13 @@ const HomePage = () => {
           href={TABAWAKE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full max-w-4xl transition-opacity hover:opacity-90"
+          className="block w-full max-w-4xl"
         >
           <NextImage
             src={tabawake}
             alt="tabawake — keeps this tab awake"
-            placeholder="blur"
             sizes="(max-width: 896px) 100vw, 896px"
+            quality={100}
             className="border-2 border-[rgba(0,0,0,0.333)] w-full h-auto"
           />
         </a>
