@@ -46,7 +46,7 @@ const HomePage = () => {
           href={TABAWAKE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full max-w-4xl transition-opacity hover:opacity-90"
+          className="block w-full max-w-4xl"
         >
           <NextImage
             src={tabawake}
