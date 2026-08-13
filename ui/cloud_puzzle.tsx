@@ -6,7 +6,7 @@ import { usePuzzle } from '../lib/puzzle/use_puzzle'
 import { ASPECT, PuzzleView } from './puzzle_view'
 
 /**
- * "coming soon" line + optional cover image. Both open the same Express Interest
+ * Caption + optional cover image. Both open the same Express Interest
  * modal (puzzle → signup), matching the tabawake image→link pattern.
  */
 export const CloudPuzzleSignup = ({
@@ -22,7 +22,7 @@ export const CloudPuzzleSignup = ({
   return (
     <>
       <div className="text-secondary text-[13px] mb-4">
-        {'coming soon \u2014 agentic engineering 101 \u2014 '}
+        {'agentic engineering 101 \u2014 '}
         <button
           type="button"
           onClick={openModal}
