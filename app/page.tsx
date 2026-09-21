@@ -6,10 +6,12 @@ import ivySmiling from '../public/ivy-smiling.png'
 import pestoPasta from '../public/pesto-pasta.png'
 import polly from '../public/polly.png'
 import tabawake from '../public/tabawake.jpg'
+import time from '../public/time.jpg'
 import { CloudPuzzleSignup } from '../ui/cloud_puzzle'
+import { ListingCaption } from '../ui/listing_caption'
 import { Page } from '../ui/page'
 
-/** Live tabawake app — update when the host lands. */
+const TIME_URL = 'https://time.armancharan.com'
 const TABAWAKE_URL = 'https://tabawake.armancharan.com'
 
 const HomePage = () => {
@@ -31,17 +33,55 @@ const HomePage = () => {
       </h1>
 
       <section className="mt-32">
-        <div className="text-secondary text-[13px] mb-4">
-          {'tabawake \u2014 '}
-          <a
-            href={TABAWAKE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2"
-          >
-            open {'\u2192'}
-          </a>
-        </div>
+        <ListingCaption
+          name="Time"
+          date="12 Sep 2026"
+          dateTime="2026-09-12"
+          description="An ode to time I made for my sister Mica."
+          action={
+            <a
+              href={TIME_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2"
+            >
+              open {'\u2192'}
+            </a>
+          }
+        />
+        <a
+          href={TIME_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full max-w-4xl"
+        >
+          <NextImage
+            src={time}
+            alt="time — a monument, to the concept, that is"
+            placeholder="blur"
+            sizes="(max-width: 896px) 100vw, 896px"
+            className="border-2 border-[rgba(0,0,0,0.333)] w-full h-auto"
+          />
+        </a>
+      </section>
+
+      <section className="mt-32">
+        <ListingCaption
+          name="Tabawake"
+          date="12 Aug 2026"
+          dateTime="2026-08-12"
+          description="A toy project, to demonstrate cross-platform fundamentals; keeps screens awake (for example, while agents churn)."
+          action={
+            <a
+              href={TABAWAKE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2"
+            >
+              open {'\u2192'}
+            </a>
+          }
+        />
         <a
           href={TABAWAKE_URL}
           target="_blank"
@@ -60,6 +100,9 @@ const HomePage = () => {
 
       <section className="mt-32">
         <CloudPuzzleSignup
+          date="20 Jun 2026"
+          dateTime="2026-06-20"
+          description="A practical course on turning ideas into shippable software with agents."
           cover={
             <NextImage
               src={agenticEngineering101}

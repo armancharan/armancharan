@@ -3,6 +3,7 @@
 import { track } from '@vercel/analytics'
 import { useEffect, useState, type ReactNode } from 'react'
 import { usePuzzle } from '../lib/puzzle/use_puzzle'
+import { ListingCaption } from './listing_caption'
 import { ASPECT, PuzzleView } from './puzzle_view'
 
 /**
@@ -11,9 +12,15 @@ import { ASPECT, PuzzleView } from './puzzle_view'
  */
 export const CloudPuzzleSignup = ({
   cover,
+  date,
+  dateTime,
+  description,
 }: {
   cover?: ReactNode
-} = {}) => {
+  date: string
+  dateTime: string
+  description: string
+}) => {
   const [open, setOpen] = useState(false)
   const openModal = () => {
     track('express_interest_open', { project: 'agentic-engineering-101' })
@@ -21,22 +28,27 @@ export const CloudPuzzleSignup = ({
   }
   return (
     <>
-      <div className="text-secondary text-[13px] mb-4">
-        {'agentic engineering 101 \u2014 '}
-        <button
-          type="button"
-          onClick={openModal}
-          style={{ font: 'inherit' }}
-          className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
-        >
-          express interest {'\u2192'}
-        </button>
-      </div>
+      <ListingCaption
+        name="Agentic Engineering 101"
+        date={date}
+        dateTime={dateTime}
+        description={description}
+        action={
+          <button
+            type="button"
+            onClick={openModal}
+            style={{ font: 'inherit' }}
+            className="inline cursor-pointer align-baseline text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70"
+          >
+            express interest {'\u2192'}
+          </button>
+        }
+      />
       {cover ? (
         <button
           type="button"
           onClick={openModal}
-          aria-label="Express interest in agentic engineering 101"
+          aria-label="Express interest in Agentic Engineering 101"
           className="block w-full max-w-4xl cursor-pointer appearance-none border-0 bg-transparent p-0 text-left"
         >
           {cover}
@@ -92,7 +104,7 @@ const Modal = ({
               Express Interest
             </h2>
             <p className="mt-2 text-[11px] tracking-[0.12em] text-secondary">
-              agentic engineering 101
+              Agentic Engineering 101
             </p>
           </div>
           {children}
