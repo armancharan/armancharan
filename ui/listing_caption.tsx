@@ -25,3 +25,29 @@ export const ListingCaption = ({
     </div>
   )
 }
+
+/** Site and source links, one per line, alphabetical by label. */
+export const ListingLinks = ({
+  className,
+  links,
+}: {
+  className: string
+  links: readonly { href: string; label: string }[]
+}) => {
+  const ordered = [...links].sort((a, b) => a.label.localeCompare(b.label))
+  return (
+    <>
+      {ordered.map(link => (
+        <a
+          key={link.href}
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={className}
+        >
+          {link.label} {'\u2192'}
+        </a>
+      ))}
+    </>
+  )
+}

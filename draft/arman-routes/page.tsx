@@ -1,15 +1,15 @@
 import NextImage, { type StaticImageData } from 'next/image'
 import { twMerge } from 'tailwind-merge'
-import agenticEngineering101 from '../public/agentic-engineering-101.png'
-import featherstonNumeroIv from '../public/featherston-numero-iv.png'
-import ivySmiling from '../public/ivy-smiling.png'
-import pestoPasta from '../public/pesto-pasta.png'
-import polly from '../public/polly.png'
-import tabawake from '../public/tabawake.jpg'
-import time from '../public/time.jpg'
-import { CloudPuzzleSignup } from '../ui/cloud_puzzle'
-import { ListingCaption, ListingLinks } from '../ui/listing_caption'
-import { Page } from '../ui/page'
+import agenticEngineering101 from '../../public/agentic-engineering-101.png'
+import featherstonNumeroIv from '../../public/featherston-numero-iv.png'
+import ivySmiling from '../../public/ivy-smiling.png'
+import pestoPasta from '../../public/pesto-pasta.png'
+import polly from '../../public/polly.png'
+import tabawake from '../../public/tabawake.jpg'
+import time from '../../public/time.jpg'
+import { CloudPuzzleSignup } from '../../ui/cloud_puzzle'
+import { ListingCaption, ListingLinks } from '../../ui/listing_caption'
+import { Page } from '../../ui/page'
 
 const TIME_URL = 'https://time.armancharan.com'
 const TIME_SOURCE_URL = 'https://github.com/armancharan/time'
@@ -17,7 +17,7 @@ const TABAWAKE_URL = 'https://tabawake.armancharan.com'
 const TABAWAKE_SOURCE_URL = 'https://github.com/armancharan/tabawake'
 
 const LINK_CLASS =
-  'block cursor-pointer text-primary underline decoration-from-font underline-offset-2'
+  'block cursor-pointer text-primary underline decoration-from-font underline-offset-2 transition-opacity hover:opacity-70'
 
 const HomePage = () => {
   return (
