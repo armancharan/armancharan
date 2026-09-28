@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { jitterTips, lerpPaths, normalizePath, pathToD, pullInside } from './bass_contour'
 
 const OUTER_D = "M7 77l6-9-9 3.5L5.5 69 2 68l12.5-4.5-7.5-2 7-2-8.5-2 6-.5L6 55.5l5.5-1.5-1-1.5-6.5-4 13.5-1V46L13 39.5l8.5 3V38h5l-1-2.5 7 1.5 4.5-6v4l1.5 1 2-2 2.5 2v-2l2 .5 2-29L50 32l1 3.5 2-5.5v9l1.5.5V35l3 3 .5-3.5 2.5 1.5L62 21.5 65.5 34v-2l2.5 2 3-4.5 1.5 3L84 1l-6.5 28.5L78 40l3 2-2-4 3 1v-3.5l5 2v-3l2.5 1 1-5.5 4 3L96 15.5 99.5 32l1.5-2.5 2 5 2.5-4.5v7l2.5 2.5-1-4.5 3 2.5.5-.5 3 1 2-3.5 2 1.5 9-18-5 18 2-1.5 1 2.5 3-13c1.167 4.833 3.5 14.7 3.5 15.5 0 .8 2.333-2 3.5-3.5l-1 10c4.667 1.667 14.1 5.1 14.5 5.5.4.4-7.167.167-11 0l-3.5 1L148 57l-9 1 2.5 1-4.5.5 9.5 2.5-11 2.5L139 66l-6.5 2.5 9.5 11-13.5-7.5.5 3-5.5-2.5 1 4.5-6-4-1 2-2-1.5-4 6.5-1-6-1.5-1-1 .5-1.5-.5-1.5 2-2-1.5v.5l-2-2.5-1.5 2-1-.5v3l-4-2.5-2 2.5-1-2-1 2H89l-9 23.5 4-26-2.5.5-2.5-2v1.5L77.5 72l-1 4-3.5-2.5-7.5 6L67 73l-1-1-.5 2-3.5-1-1.5 4-4.5-3-3 4.5-2-3.5-1 3.5-3-5-1 3.5-2-1-9 12 3.5-14.5L35 77c-.4.4-.167-2.167 0-3.5L33 75l-7.5 17-1.5-1.5L25.5 77H24l-1-5.5-3 3.5v-3.5L17.5 73 7 77z"
@@ -28,11 +28,69 @@ export type BassSeed = keyof typeof VARIANTS
 
 const DURATION_MS = 300
 
+const BassEngagedContext = createContext<{
+  engaged: boolean
+  pointerEnter: () => void
+  pointerLeave: () => void
+  release: () => void
+} | null>(null)
+
+/** Hover engages every mark. Leaving or clicking returns them to rest; a click stays at rest until the next hover. */
+export const BassEngagedProvider = ({ children }: { children: ReactNode }) => {
+  const [engaged, setEngaged] = useState(false)
+  const hovering = useRef(0)
+  const dismissed = useRef(false)
+  const releaseTimer = useRef<number | null>(null)
+
+  const cancelRelease = () => {
+    if (releaseTimer.current === null) return
+    window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = null
+  }
+
+  const pointerEnter = useCallback(() => {
+    hovering.current += 1
+    cancelRelease()
+    if (!dismissed.current) setEngaged(true)
+  }, [])
+
+  const pointerLeave = useCallback(() => {
+    hovering.current = Math.max(0, hovering.current - 1)
+    if (hovering.current > 0) return
+    dismissed.current = false
+    cancelRelease()
+    releaseTimer.current = window.setTimeout(() => {
+      releaseTimer.current = null
+      setEngaged(false)
+    }, 40)
+  }, [])
+
+  const release = useCallback(() => {
+    dismissed.current = true
+    cancelRelease()
+    setEngaged(false)
+  }, [])
+
+  useEffect(() => () => cancelRelease(), [])
+
+  return (
+    <BassEngagedContext.Provider value={{ engaged, pointerEnter, pointerLeave, release }}>
+      {children}
+    </BassEngagedContext.Provider>
+  )
+}
+
 export const Bass = ({ seed }: { seed: BassSeed }) => {
+  const engagedState = useContext(BassEngagedContext)
+  const engaged = engagedState?.engaged ?? false
+  const pointerEnter = engagedState?.pointerEnter
+  const pointerLeave = engagedState?.pointerLeave
+  const release = engagedState?.release
   const outerRef = useRef<SVGPathElement>(null)
   const innerRef = useRef<SVGPathElement>(null)
   const tRef = useRef(0)
   const frame = useRef<number | null>(null)
+  const sawEngaged = useRef(engaged)
   const variant = VARIANTS[seed]
 
   const paint = (t: number) => {
@@ -66,6 +124,12 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
     frame.current = requestAnimationFrame(step)
   }
 
+  useEffect(() => {
+    if (sawEngaged.current === engaged) return
+    sawEngaged.current = engaged
+    animateTo(engaged ? 1 : 0)
+  }, [engaged])
+
   useEffect(
     () => () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current)
@@ -74,10 +138,15 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
   )
 
   return (
-    <div
-      className="group h-[50px] inline-flex items-center m-6"
-      onPointerEnter={() => animateTo(1)}
-      onPointerLeave={() => animateTo(0)}
+    <button
+      type="button"
+      aria-pressed={engaged}
+      aria-label="Bass marks"
+      data-engaged={engaged ? 'true' : 'false'}
+      className="group h-[50px] inline-flex cursor-pointer items-center m-6 appearance-none border-0 bg-transparent p-0"
+      onPointerEnter={() => pointerEnter?.()}
+      onPointerLeave={() => pointerLeave?.()}
+      onClick={() => release?.()}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -95,16 +164,16 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
         />
         <path
           ref={innerRef}
-          className="fill-[#EC1D22] transition-colors duration-300 ease-out motion-reduce:transition-none group-hover:fill-[#C9F004]"
+          className="fill-[#EC1D22] transition-colors duration-300 ease-out motion-reduce:transition-none group-data-[engaged=true]:fill-[#C9F004]"
           stroke="#F3AA50"
           strokeWidth="0.75"
           d={INNER_REST_D}
         />
         <path
-          className="fill-white transition-colors duration-300 ease-out motion-reduce:transition-none group-hover:fill-[#333333]"
+          className="fill-white transition-colors duration-300 ease-out motion-reduce:transition-none group-data-[engaged=true]:fill-[#333333]"
           d={LETTERS_D}
         />
       </svg>
-    </div>
+    </button>
   )
 }

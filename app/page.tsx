@@ -7,7 +7,7 @@ import pestoPasta from '../public/pesto-pasta.png'
 import polly from '../public/polly.png'
 import tabawake from '../public/tabawake.jpg'
 import time from '../public/time.jpg'
-import { Bass } from '../ui/bass'
+import { Bass, BassEngagedProvider } from '../ui/bass'
 import { CloudPuzzleSignup } from '../ui/cloud_puzzle'
 import { ListingCaption, ListingLinks } from '../ui/listing_caption'
 import { Page } from '../ui/page'
@@ -26,20 +26,22 @@ const UNHIGHLIGHTABLE_IMAGE =
 const HomePage = () => {
   return (
     <Page>
-      <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
-        "Oh, <Bass seed={1} />, cool"
-        <Image className={'h-16'} src={ivySmiling} />
-      </h1>
-      <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
-        You know how you
-        <Image src={pestoPasta} /> make the <Bass seed={2} /> better?
-      </h1>
-      <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
-        Crank <Image src={featherstonNumeroIv} /> the <Bass seed={3} /> up
-      </h1>
-      <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
-        (Yeah) <Image src={polly} />
-      </h1>
+      <BassEngagedProvider>
+        <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
+          "Oh, <Bass seed={1} />, cool"
+          <Image className={'h-16'} src={ivySmiling} />
+        </h1>
+        <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
+          You know how you
+          <Image src={pestoPasta} /> make the <Bass seed={2} /> better?
+        </h1>
+        <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
+          Crank <Image src={featherstonNumeroIv} /> the <Bass seed={3} /> up
+        </h1>
+        <h1 className="flex items-center flex-wrap justify-start min-h-30 leading-[60px] text-5xl font-medium italic text-white">
+          (Yeah) <Image src={polly} />
+        </h1>
+      </BassEngagedProvider>
 
       <section className="mt-32">
         <ListingCaption
