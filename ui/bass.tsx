@@ -32,14 +32,13 @@ const BassEngagedContext = createContext<{
   engaged: boolean
   pointerEnter: () => void
   pointerLeave: () => void
-  release: () => void
+  toggle: () => void
 } | null>(null)
 
-/** Hover engages every mark. Leaving or clicking returns them to rest; a click stays at rest until the next hover. */
+/** Hover engages every mark. Click toggles that state, and leaving clears it. */
 export const BassEngagedProvider = ({ children }: { children: ReactNode }) => {
   const [engaged, setEngaged] = useState(false)
   const hovering = useRef(0)
-  const dismissed = useRef(false)
   const releaseTimer = useRef<number | null>(null)
 
   const cancelRelease = () => {
@@ -51,13 +50,12 @@ export const BassEngagedProvider = ({ children }: { children: ReactNode }) => {
   const pointerEnter = useCallback(() => {
     hovering.current += 1
     cancelRelease()
-    if (!dismissed.current) setEngaged(true)
+    setEngaged(true)
   }, [])
 
   const pointerLeave = useCallback(() => {
     hovering.current = Math.max(0, hovering.current - 1)
     if (hovering.current > 0) return
-    dismissed.current = false
     cancelRelease()
     releaseTimer.current = window.setTimeout(() => {
       releaseTimer.current = null
@@ -65,16 +63,15 @@ export const BassEngagedProvider = ({ children }: { children: ReactNode }) => {
     }, 40)
   }, [])
 
-  const release = useCallback(() => {
-    dismissed.current = true
+  const toggle = useCallback(() => {
     cancelRelease()
-    setEngaged(false)
+    setEngaged(value => !value)
   }, [])
 
   useEffect(() => () => cancelRelease(), [])
 
   return (
-    <BassEngagedContext.Provider value={{ engaged, pointerEnter, pointerLeave, release }}>
+    <BassEngagedContext.Provider value={{ engaged, pointerEnter, pointerLeave, toggle }}>
       {children}
     </BassEngagedContext.Provider>
   )
@@ -85,7 +82,7 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
   const engaged = engagedState?.engaged ?? false
   const pointerEnter = engagedState?.pointerEnter
   const pointerLeave = engagedState?.pointerLeave
-  const release = engagedState?.release
+  const toggle = engagedState?.toggle
   const outerRef = useRef<SVGPathElement>(null)
   const innerRef = useRef<SVGPathElement>(null)
   const tRef = useRef(0)
@@ -146,7 +143,7 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
       className="group h-[50px] inline-flex cursor-pointer items-center m-6 appearance-none border-0 bg-transparent p-0"
       onPointerEnter={() => pointerEnter?.()}
       onPointerLeave={() => pointerLeave?.()}
-      onClick={() => release?.()}
+      onClick={() => toggle?.()}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
