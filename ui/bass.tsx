@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { jitterTips, lerpPaths, normalizePath, pathToD, pullInside } from './bass_contour'
+import { jitterTips, normalizePath, pathToD, pullInside } from './bass_contour'
 
 const OUTER_D = "M7 77l6-9-9 3.5L5.5 69 2 68l12.5-4.5-7.5-2 7-2-8.5-2 6-.5L6 55.5l5.5-1.5-1-1.5-6.5-4 13.5-1V46L13 39.5l8.5 3V38h5l-1-2.5 7 1.5 4.5-6v4l1.5 1 2-2 2.5 2v-2l2 .5 2-29L50 32l1 3.5 2-5.5v9l1.5.5V35l3 3 .5-3.5 2.5 1.5L62 21.5 65.5 34v-2l2.5 2 3-4.5 1.5 3L84 1l-6.5 28.5L78 40l3 2-2-4 3 1v-3.5l5 2v-3l2.5 1 1-5.5 4 3L96 15.5 99.5 32l1.5-2.5 2 5 2.5-4.5v7l2.5 2.5-1-4.5 3 2.5.5-.5 3 1 2-3.5 2 1.5 9-18-5 18 2-1.5 1 2.5 3-13c1.167 4.833 3.5 14.7 3.5 15.5 0 .8 2.333-2 3.5-3.5l-1 10c4.667 1.667 14.1 5.1 14.5 5.5.4.4-7.167.167-11 0l-3.5 1L148 57l-9 1 2.5 1-4.5.5 9.5 2.5-11 2.5L139 66l-6.5 2.5 9.5 11-13.5-7.5.5 3-5.5-2.5 1 4.5-6-4-1 2-2-1.5-4 6.5-1-6-1.5-1-1 .5-1.5-.5-1.5 2-2-1.5v.5l-2-2.5-1.5 2-1-.5v3l-4-2.5-2 2.5-1-2-1 2H89l-9 23.5 4-26-2.5.5-2.5-2v1.5L77.5 72l-1 4-3.5-2.5-7.5 6L67 73l-1-1-.5 2-3.5-1-1.5 4-4.5-3-3 4.5-2-3.5-1 3.5-3-5-1 3.5-2-1-9 12 3.5-14.5L35 77c-.4.4-.167-2.167 0-3.5L33 75l-7.5 17-1.5-1.5L25.5 77H24l-1-5.5-3 3.5v-3.5L17.5 73 7 77z"
 const INNER_D = "M28.5 38l4.5 2 2.5-3v3l2-2 1 2.5 1.5-3 .5 2.5 1-2 2 2.5 1-3.5 1.5 4 1-20 1 21 1.5-6v6.5l3-5-1.5 7 1.5-.5-1.5 7 1-1.5v3l1.5.5v-4.5H55l-.5-2H56l-1.5-5 2 2.5v-5l2 2.5.5-4.5 2 3 2-11 1 11.5 2.5-4.5v4l4.5-8-2.5 8 2.5-3 .5 3L78 18.5l-4.5 22L76 36l2 13.5.5-3.5 1 2h1l.5-2-2.5-2 3.5.5-1-1 2.5-1L81 40l3.5 2-1-4 2.5 3 .5-2 2 1v-2.5L90 40l.5-2 2 2-1-7 3 6.5V35l2.5 4.5-.5-14.5L99 40l2-7v8l3.5-6-1 7 1-1.5 2 4v-2L108 44v-2.5l2.5.5-1-2.5 2.5 1 .5-1 1.5.5 2-2.5 1.5 3 5.5-14-3.5 13.5 1.5-2 2.5 2-.5-2.5 3.5 3V33l3.5 9.5 2.5-.5-1 5.5 9 3-10.5-1 1.5 2-2.5 2 13 3h-10.5L135 59l-3.5 2 8.5 1-11 2.5 6 2-8.5 1L137 75l-12.5-6.5 1 3-5-2L122 74l-4.5-4.5-1.5 2-2-1-2 6v-6l-2 1-2-2-1.5 2-2-2V73l-2-4v2.5L101 69l-2 2.5-2.5-2V73l-2-2.5-2 2.5v-2.5L89 74v-3.5l-7 22 4-22-4 2.5-4-4v1.5L76 69v4l-2.5-2.5-6 4.5 2.5-4.5-2.5 1-3-2v2l-3.5-1-2 3.5-3.5-2.5-3 3.5-.5-5.5-2.5 4.5-2.5-3.5-1.5 3.5-2.5-3.5-4.5 11 2-10-4 1.5v-3.5c-.833 1.167-2.6 3.5-3 3.5-.4 0-.833-1.667-1-2.5l-6 16 3-16-4 3.5-.5-4.5-3 1 .5-1.5H20l1-2.5-9 6.5 8-8.5L8 68l10.5-5-6-2H19l-7-3.5 6.5 2-2-2L20 56l-9.5-.5 10.5-2h-8.5l9.5-2-14-2h14.5l-2.5-2h3.5l-8-5.5 8.5 3.5-1.5-3.5 5 .5-4-2.5 6 .5-1-2.5z"
@@ -15,7 +15,7 @@ const INNER_REST_D = pathToD(INNER_REST)
 const arrange = (seed: number) => {
   const outer = jitterTips(OUTER_REST, seed, 8)
   const inner = pullInside(outer, jitterTips(INNER_REST, seed, 4.5))
-  return { outer, inner }
+  return { outer: pathToD(outer), inner: pathToD(inner) }
 }
 
 const VARIANTS = {
@@ -25,8 +25,6 @@ const VARIANTS = {
 }
 
 export type BassSeed = keyof typeof VARIANTS
-
-const DURATION_MS = 300
 
 const BassEngagedContext = createContext<{
   engaged: boolean
@@ -83,56 +81,7 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
   const pointerEnter = engagedState?.pointerEnter
   const pointerLeave = engagedState?.pointerLeave
   const toggle = engagedState?.toggle
-  const outerRef = useRef<SVGPathElement>(null)
-  const innerRef = useRef<SVGPathElement>(null)
-  const tRef = useRef(0)
-  const frame = useRef<number | null>(null)
-  const sawEngaged = useRef(engaged)
   const variant = VARIANTS[seed]
-
-  const paint = (t: number) => {
-    const outer = outerRef.current
-    const inner = innerRef.current
-    if (!outer || !inner) return
-    outer.setAttribute('d', lerpPaths(OUTER_REST, variant.outer, t))
-    inner.setAttribute('d', lerpPaths(INNER_REST, variant.inner, t))
-  }
-
-  const animateTo = (target: number) => {
-    if (frame.current !== null) cancelAnimationFrame(frame.current)
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) {
-      tRef.current = target
-      paint(target)
-      frame.current = null
-      return
-    }
-    const from = tRef.current
-    const start = performance.now()
-    const step = (now: number) => {
-      const u = Math.min(1, (now - start) / DURATION_MS)
-      const eased = 1 - (1 - u) ** 3
-      const t = from + (target - from) * eased
-      tRef.current = t
-      paint(t)
-      if (u < 1) frame.current = requestAnimationFrame(step)
-      else frame.current = null
-    }
-    frame.current = requestAnimationFrame(step)
-  }
-
-  useEffect(() => {
-    if (sawEngaged.current === engaged) return
-    sawEngaged.current = engaged
-    animateTo(engaged ? 1 : 0)
-  }, [engaged])
-
-  useEffect(
-    () => () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current)
-    },
-    [],
-  )
 
   return (
     <button
@@ -153,21 +102,19 @@ export const Bass = ({ seed }: { seed: BassSeed }) => {
         viewBox="0 0 149 100"
       >
         <path
-          ref={outerRef}
           fill="#42E5A3"
           stroke="#DDA290"
           strokeWidth="0.75"
-          d={OUTER_REST_D}
+          d={engaged ? variant.outer : OUTER_REST_D}
         />
         <path
-          ref={innerRef}
-          className="fill-[#EC1D22] transition-colors duration-300 ease-out motion-reduce:transition-none group-data-[engaged=true]:fill-[#C9F004]"
+          className="fill-[#EC1D22] group-data-[engaged=true]:fill-[#C9F004]"
           stroke="#F3AA50"
           strokeWidth="0.75"
-          d={INNER_REST_D}
+          d={engaged ? variant.inner : INNER_REST_D}
         />
         <path
-          className="fill-white transition-colors duration-300 ease-out motion-reduce:transition-none group-data-[engaged=true]:fill-[#333333]"
+          className="fill-white group-data-[engaged=true]:fill-[#333333]"
           d={LETTERS_D}
         />
       </svg>

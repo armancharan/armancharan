@@ -262,30 +262,3 @@ export const pullInside = (outer: AbsCmd[], inner: AbsCmd[]): AbsCmd[] => {
     return { ...cmd, x, y }
   })
 }
-
-export const lerpPaths = (from: AbsCmd[], to: AbsCmd[], t: number): string => {
-  const cmds: AbsCmd[] = from.map((cmd, index) => {
-    const next = to[index]
-    if (cmd.op === 'Z' || !next || next.op !== cmd.op) return cmd
-    if (cmd.op === 'C' && next.op === 'C') {
-      return {
-        op: 'C',
-        x1: cmd.x1 + (next.x1 - cmd.x1) * t,
-        y1: cmd.y1 + (next.y1 - cmd.y1) * t,
-        x2: cmd.x2 + (next.x2 - cmd.x2) * t,
-        y2: cmd.y2 + (next.y2 - cmd.y2) * t,
-        x: cmd.x + (next.x - cmd.x) * t,
-        y: cmd.y + (next.y - cmd.y) * t,
-      }
-    }
-    if ((cmd.op === 'M' || cmd.op === 'L') && (next.op === 'M' || next.op === 'L')) {
-      return {
-        op: cmd.op,
-        x: cmd.x + (next.x - cmd.x) * t,
-        y: cmd.y + (next.y - cmd.y) * t,
-      }
-    }
-    return cmd
-  })
-  return pathToD(cmds)
-}
